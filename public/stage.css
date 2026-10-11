@@ -187,3 +187,6 @@ body[data-screen="result"] .lyrics { opacity: 0; transform: translate3d(0, -30px
 @media (prefers-reduced-motion: reduce) {
   .blob, .phone-card, .gate-btn { animation: none; }
 }
+body[data-screen="result"] .show .returning { display: none; }
+.char { background: radial-gradient(circle at 35% 30%, rgba(var(--accent-rgb), 0.85), rgba(var(--accent-rgb), 0.25) 60%, #15151c); }
+.char img.broken { opacity: 0; }

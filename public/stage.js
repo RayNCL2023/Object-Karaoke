@@ -15,6 +15,7 @@ const Beat = {
     return Math.pow(1 - phase, 4);
   },
   sting(n) { try { beats.playSting?.(n); } catch (e) { console.warn("[stage] sting", e); } },
+  duck(on) { try { beats.setDuck?.(on); } catch (e) { console.warn("[stage] duck", e); } },
 };
 
 // ---------- DOM ----------
@@ -181,7 +182,7 @@ function drawQr(url) {
   } catch { el.qr.classList.add("empty"); }
 }
 async function getBoard() {
-  try { const r = await fetch("/api/leaderboard"); if (!r.ok) throw 0; const b = await r.json(); return Array.isArray(b) ? b : []; } catch { return []; }
+  try { const r = await fetch(`/api/leaderboard${session?.mock ? "?mock=1" : ""}`); if (!r.ok) throw 0; const b = await r.json(); return Array.isArray(b) ? b : []; } catch { return []; }
 }
 async function refreshBoard(highlight) {
   const b = await getBoard();
@@ -251,6 +252,8 @@ async function startShow(s) {
 
   const c = s.character || {};
   setAccent(c.colour);
+  el.charImg.classList.remove("broken");
+  el.charImg.onerror = () => el.charImg.classList.add("broken");
   el.charImg.src = s.photo || "";
   el.charName.textContent = c.name || "Mystery Object";
   el.charObject.textContent = s.object ? `the ${s.object}` : "";
@@ -290,11 +293,16 @@ async function objectLine(i, line, myRun, c) {
   const ms = line.ms || 3500;
   wipe(i, ms);
   const seed = [...(c.name || "x")].reduce((a, ch) => a + ch.charCodeAt(0), 0);
-  if (line.audio) {
-    try { await playMp3(line.audio, ms, retimeWipe); return; } catch (e) { console.warn("[stage] line audio failed, using fallback voice", e.message); }
-  }
-  guard(myRun);
-  await speakFallback(line.text, ms, seed);
+  // MOCK sessions and failed TTS lines carry silent MP3s: use the free browser voice so the demo is audible.
+  const silent = session?.mock || line.ttsFailed;
+  Beat.duck(true);
+  try {
+    if (line.audio && !silent) {
+      try { await playMp3(line.audio, ms, retimeWipe); return; } catch (e) { console.warn("[stage] line audio failed, using fallback voice", e.message); }
+    }
+    guard(myRun);
+    await speakFallback(line.text, ms, seed);
+  } finally { Beat.duck(false); }
 }
 
 async function youLine(i, line, myRun) {
@@ -316,7 +324,7 @@ async function youLine(i, line, myRun) {
 
   const take = await Promise.race([
     new Promise((r) => takeWaiters.set(i, r)),
-    sleep(ms + 3000).then(() => null),
+    sleep(ms + 5000).then(() => null), // phone records ms+300, then upload + speech-to-text
   ]);
   takeWaiters.delete(i);
   guard(myRun);
@@ -408,7 +416,7 @@ async function showVerdict(v, myRun) {
   // Roast: type the text while the object speaks it
   typeText(el.roast, v.roast || "", 2800);
   const roastMs = Math.max(2500, (v.roast || "").length * 60);
-  if (v.audio) { try { await playMp3(v.audio, roastMs); return; } catch {} }
+  if (v.audio && !session?.mock) { try { await playMp3(v.audio, roastMs); return; } catch {} }
   if (myRun === run && v.roast) speakFallback(v.roast, roastMs, 3);
 }
 function typeText(node, text, ms) {
