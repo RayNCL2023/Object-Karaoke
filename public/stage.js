@@ -883,7 +883,7 @@ async function battleRounds(s, myRun, c) {
     await sleep(Math.max(0, 1100 - (performance.now() - t0))); guard(myRun);
     setPose(null);
     el.got.classList.remove("show");
-    const cb = done?.comeback?.text ? done.comeback : { text: said ? `"${said.split(" ").slice(0, 5).join(" ")}"? Is that it, you melt?` : "Cat got your tongue? Absolute weapon." };
+    const cb = done?.comeback?.text ? done.comeback : { text: said ? `"${said.split(" ").slice(0, 5).join(" ")}"? Is that it, you plonker?` : "Cat got your tongue? Absolute weapon." };
     const ci = addLyric("object", cb.text, name);
     focusLine(ci);
     await objectLine(ci, cb, myRun, c);
@@ -1016,7 +1016,7 @@ async function judge(myRun) {
     console.warn("[stage] judge failed, local verdict", e.message);
     const accs = [...takes.values()].map((t) => t.accuracy);
     const avg = accs.length ? accs.reduce((a, b) => a + b, 0) / accs.length : 0.5;
-    v = { score: Math.round(30 + avg * 50), roast: "Is that it? Absolute melt. My kettle's got better bars than you, our kid." };
+    v = { score: Math.round(30 + avg * 50), roast: "Is that it? Absolute shambles. My kettle's got better bars than you, our kid." };
     if (session?.demo && session.battle) {
       v = { score: 58 + Math.round(Math.random() * 20), roast: "Hold my tea? You couldn't hold a tune. Best line was the dust one, our kid, and even that was dusty.", best: DEMO_BARS[2][0], worst: "(silence)", categories: { wit: 6, rhymes: 4, comebacks: 5, confidence: 7 } };
       if (crowdTally?.total) { v.score = Math.max(0, Math.min(100, v.score + crowdTally.bonus)); v.crowd = { player: crowdTally.player, object: crowdTally.object, bonus: crowdTally.bonus }; }
@@ -1251,11 +1251,11 @@ const demoTakes = new Map();
 function demoBattle() {
   const d = demoSession();
   d.mode = "battle"; d.battle = { ...demoCfg };
-  d.song = { title: "Brew Beef", genre: "hip hop", bpm: 92, key: "C", lines: [{ who: "object", text: "Look at you, our kid, stood there like a muppet. I've held better bars in me since 1996. Go on then, you melt.", ms: 6000 }] };
+  d.song = { title: "Brew Beef", genre: "hip hop", bpm: 92, key: "C", lines: [{ who: "object", text: "Look at you, our kid, stood there like a muppet. I've held better bars in me since 1996. Go on then, you numpty.", ms: 6000 }] };
   return d;
 }
 const DEMO_BARS = [
-  ["you're just a mug, you hold my tea, nobody even knows your name", "Hold your tea? You couldn't hold a tune, you melt. Nobody knows my name? Mate, nobody's asked for yours."],
+  ["you're just a mug, you hold my tea, nobody even knows your name", "Hold your tea? You couldn't hold a tune, you wet wipe. Nobody knows my name? Mate, nobody's asked for yours."],
   ["", "Cat got your tongue? Proper silence, absolute weapon. Even the kettle's louder than you, muppet."],
   ["at least I can walk, you sit on a desk all day collecting dust", ""],
 ];
