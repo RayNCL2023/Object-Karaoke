@@ -68,25 +68,47 @@ body[data-screen="result"] .show { opacity: 1; visibility: visible; transform: n
 .qr.empty { background: var(--panel); }
 .phone-label { margin-top: 10px; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); }
 .phone-url { font: 700 clamp(18px, 1.7vw, 26px) var(--display); color: var(--ink); word-break: break-all; text-align: center; }
+.phone-hint { font-size: 14px; color: var(--accent); font-weight: 600; text-align: center; min-height: 1em; }
 .phone-usb { font-size: 14px; color: var(--dim); }
 .phone-usb b { color: rgba(246, 243, 238, 0.75); font-weight: 600; }
 
 /* ---------- Show ---------- */
 .show { display: grid; grid-template-columns: minmax(320px, 0.9fr) 1.3fr; align-items: center; gap: 4vw; padding: 5vh 5vw; }
 .char-col { display: grid; justify-items: center; gap: 28px; }
-.char-wrap { position: relative; width: min(36vw, 62vh); aspect-ratio: 1; will-change: transform; }
-.char-glow { position: absolute; inset: -12%; border-radius: 50%; background: radial-gradient(circle, rgba(var(--accent-rgb), 0.55), transparent 62%); filter: blur(30px); will-change: opacity, transform; }
-.char { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; border: 8px solid var(--accent); box-shadow: 0 0 0 10px rgba(var(--accent-rgb), 0.16), 0 40px 120px rgba(0, 0, 0, 0.6); background: #222; transition: border-color 0.8s var(--ease); }
-.char img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.04); }
-.face { position: absolute; inset: 0; }
-.eye { position: absolute; top: 34%; width: 15%; height: 15%; border-radius: 50%; background: #fff; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), inset 0 -4px 0 rgba(0, 0, 0, 0.08); transform-origin: 50% 50%; will-change: transform; }
-.eye.l { left: 27%; } .eye.r { right: 27%; }
-.eye.blink { animation: blink 0.18s ease-in-out; }
-@keyframes blink { 50% { transform: scaleY(0.08); } }
-.pupil { position: absolute; left: 30%; top: 30%; width: 44%; height: 44%; border-radius: 50%; background: #111; will-change: transform; transition: transform 0.6s var(--ease); }
-.pupil::after { content: ""; position: absolute; left: 18%; top: 16%; width: 30%; height: 30%; border-radius: 50%; background: #fff; }
-.mouth { position: absolute; left: 50%; top: 64%; width: 26%; height: 15%; margin-left: -13%; border-radius: 40% 40% 50% 50% / 30% 30% 70% 70%; background: #2a0a10; border: 4px solid #111; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); transform: scaleY(0.12); transform-origin: 50% 20%; overflow: hidden; will-change: transform; }
-.tongue { position: absolute; left: 20%; bottom: -20%; width: 60%; height: 60%; border-radius: 50%; background: #ff6f86; }
+.char-wrap { --u: 4px; position: relative; width: min(38vw, 66vh); aspect-ratio: 1; }
+.char-glow { position: absolute; left: 12%; right: 12%; top: 8%; bottom: 18%; border-radius: 50%; background: radial-gradient(circle, rgba(var(--accent-rgb), 0.55), transparent 62%); filter: blur(30px); will-change: opacity, transform; }
+.probe { display: none; }
+.rig { position: absolute; inset: 0; will-change: transform; }
+.body { position: absolute; left: 0; top: 0; transform-origin: 50% 100%; will-change: transform; }
+.sticker { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 calc(var(--u) * 1.4) calc(var(--u) * 1.4) rgba(0, 0, 0, 0.6)); }
+.sticker .outline { fill: #fff; stroke: #fff; stroke-linejoin: round; stroke-linecap: round; }
+/* Rubber-hose limbs: two rounded segments + glove/shoe, all rotated with transforms by stage.js */
+.limb { position: absolute; width: 0; height: 0; --t: calc(var(--u) * 2.6); --o: calc(var(--u) * 0.55);
+  filter: drop-shadow(var(--o) 0 0 #fff) drop-shadow(calc(var(--o) * -1) 0 0 #fff) drop-shadow(0 var(--o) 0 #fff) drop-shadow(0 calc(var(--o) * -1) 0 #fff); }
+.arm { --La: calc(var(--u) * 11); --Lb: calc(var(--u) * 12); }
+.leg { --La: calc(var(--u) * 9); --Lb: calc(var(--u) * 9); --t: calc(var(--u) * 3); }
+.seg { position: absolute; width: var(--t); border-radius: var(--t); background: #24242c; transform-origin: 50% calc(var(--t) / 2); will-change: transform; }
+.seg.a { left: calc(var(--t) / -2); top: calc(var(--t) / -2); height: calc(var(--La) + var(--t)); }
+.seg.b { left: 0; top: var(--La); height: calc(var(--Lb) + var(--t)); }
+.glove { position: absolute; width: calc(var(--u) * 7); height: calc(var(--u) * 7); left: calc(var(--t) / 2 - var(--u) * 3.5); top: calc(var(--Lb) + var(--t) / 2 - var(--u) * 2.6); border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff 0 60%, #e6e6ec); border: calc(var(--u) * 0.6) solid #111; }
+.glove::after { content: ""; position: absolute; top: 10%; width: 38%; height: 50%; border-radius: 50%; background: #fff; border: calc(var(--u) * 0.5) solid #111; }
+.arm.l .glove::after { right: -22%; } .arm.r .glove::after { left: -22%; }
+.micprop { position: absolute; left: 30%; bottom: 55%; width: calc(var(--u) * 1.8); height: calc(var(--u) * 8); border-radius: calc(var(--u) * 0.6); background: linear-gradient(90deg, #222, #555, #222); opacity: 0; transition: opacity 0.35s var(--ease); transform: rotate(18deg); transform-origin: 50% 100%; z-index: -1; }
+.micprop::before { content: ""; position: absolute; left: 50%; top: calc(var(--u) * -3.6); width: calc(var(--u) * 4.4); height: calc(var(--u) * 4.4); margin-left: calc(var(--u) * -2.2); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #eee, #888 55%, #444); border: calc(var(--u) * 0.4) solid #111; }
+.micprop.on { opacity: 1; }
+.shoe { position: absolute; width: calc(var(--u) * 9); height: calc(var(--u) * 4.6); top: calc(var(--Lb) + var(--t) / 2 - var(--u) * 1.8); background: radial-gradient(circle at 40% 30%, #fff 0 60%, #e6e6ec); border: calc(var(--u) * 0.6) solid #111; border-radius: 60% 60% 35% 35% / 80% 80% 30% 30%; will-change: transform; }
+.leg.l .shoe { left: calc(var(--t) / 2 - var(--u) * 7); transform-origin: 78% 40%; }
+.leg.r .shoe { left: calc(var(--t) / 2 - var(--u) * 2); transform-origin: 22% 40%; }
+/* Googly eyes + mouth stuck on the real object. Positions/sizes set in px by stage.js from the face fractions. */
+.face { position: absolute; inset: 0; pointer-events: none; }
+.geye { position: absolute; left: 0; top: 0; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #fff 0 55%, #e9e9ef 100%); border: 0.07em solid #111; box-shadow: 0 0.12em 0.35em rgba(0, 0, 0, 0.45); overflow: hidden; will-change: transform; }
+.geye .pupil { position: absolute; left: 50%; top: 50%; width: 52%; height: 52%; margin: -26% 0 0 -26%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #3a3a3a, #000 60%); will-change: transform; }
+.geye .lid { position: absolute; inset: -2%; border-radius: 0 0 50% 50% / 0 0 18% 18%; background: linear-gradient(#2b2b33, #44444f); transform-origin: 50% 0; transform: scaleY(0); will-change: transform; }
+.gmouth { position: absolute; left: 0; top: 0; will-change: transform; }
+.gmouth .smile { position: absolute; left: 12%; right: 12%; top: 18%; height: 40%; border-bottom: 0.06em solid #1a0508; border-radius: 0 0 50% 50% / 0 0 100% 100%; will-change: opacity; }
+.gmouth .mouth { position: absolute; inset: 0; border-radius: 45% 45% 50% 50% / 35% 35% 65% 65%; background: #5a0d18; border: 0.05em solid #1a0508; box-shadow: inset 0 0.08em 0.2em rgba(0, 0, 0, 0.6), 0 0.08em 0.3em rgba(0, 0, 0, 0.45); transform: scaleY(0); transform-origin: 50% 25%; overflow: hidden; will-change: transform, opacity; }
+.gmouth .teeth { position: absolute; left: 18%; right: 18%; top: 0; height: 18%; background: #fff; border-radius: 0 0 0.12em 0.12em; }
+.gmouth .tongue { position: absolute; left: 22%; bottom: -22%; width: 56%; height: 58%; border-radius: 50%; background: #ff6f86; }
 
 .nameplate { text-align: center; }
 .char-name { font: 800 clamp(30px, 3.4vw, 56px)/1 var(--display); letter-spacing: -0.02em; color: var(--ink); }
@@ -180,7 +202,7 @@ body[data-screen="result"] .lyrics { opacity: 0; transform: translate3d(0, -30px
   .idle { grid-template-columns: 1fr; padding: 24px 16px; gap: 28px; overflow-y: auto; align-content: start; }
   .qr { width: 200px; }
   .show { grid-template-columns: 1fr; padding: 16px; gap: 12px; align-content: start; }
-  .char-wrap { width: min(60vw, 34vh); }
+  .char-wrap { width: min(80vw, 40vh); }
   .right-col { height: 52vh; }
   .rec-live, .got { right: 16px; top: 16px; }
 }
@@ -188,5 +210,48 @@ body[data-screen="result"] .lyrics { opacity: 0; transform: translate3d(0, -30px
   .blob, .phone-card, .gate-btn { animation: none; }
 }
 body[data-screen="result"] .show .returning { display: none; }
-.char { background: radial-gradient(circle at 35% 30%, rgba(var(--accent-rgb), 0.85), rgba(var(--accent-rgb), 0.25) 60%, #15151c); }
-.char img.broken { opacity: 0; }
+
+
+/* ---------- Character roster: sticker members (gallery + crowd) ---------- */
+.cm { position: relative; font-size: var(--h, 100px); height: 1em; display: flex; flex-direction: column; align-items: center; will-change: transform; }
+.cm-body { position: relative; height: 100%; aspect-ratio: 1; filter: drop-shadow(0 0.04em 0.05em rgba(0, 0, 0, 0.55)); }
+.cm-body svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.cm-eye { position: absolute; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: #fff; border: 0.012em solid #111; overflow: hidden; }
+.cm-eye b { position: absolute; left: 24%; top: 24%; width: 52%; height: 52%; border-radius: 50%; background: #000; will-change: transform; }
+.cm-arm { position: absolute; width: 0.05em; height: 0.24em; margin-left: -0.025em; border-radius: 0.05em; background: #24242c; box-shadow: 0 0 0 0.012em #fff; transform-origin: 50% 0.025em; will-change: transform; z-index: -1; }
+.cm-arm u { position: absolute; left: 50%; bottom: -0.04em; width: 0.1em; height: 0.1em; margin-left: -0.05em; border-radius: 50%; background: #fff; border: 0.014em solid #111; }
+.cm-arm.l { transform: rotate(25deg); } .cm-arm.r { transform: rotate(-25deg); }
+.cm-bubble { position: absolute; bottom: 104%; left: 50%; padding: 0.05em 0.1em; border-radius: 0.08em; background: #fff; color: #111; font: 800 0.14em var(--display); white-space: nowrap; opacity: 0; transform: translate3d(-50%, 0.3em, 0) scale(0.6); transition: opacity 0.2s var(--ease), transform 0.35s var(--spring); pointer-events: none; }
+.cm-bubble::after { content: ""; position: absolute; left: 45%; top: 100%; border: 0.25em solid transparent; border-top-color: #fff; }
+.cm-bubble.on { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); }
+.cm-name { margin-top: 0.06em; font: 700 max(11px, 0.11em) var(--display); color: rgba(246, 243, 238, 0.8); white-space: nowrap; max-width: 9.5em; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.cm-broken { display: none; }
+
+/* Idle gallery strip */
+.roster { grid-column: 1 / -1; align-self: end; min-width: 0; }
+.roster-title { font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); font-weight: 600; margin-bottom: 8px; }
+.roster-title span { color: var(--accent); letter-spacing: 0.08em; text-transform: none; margin-left: 10px; }
+.roster-row { --h: clamp(64px, 11vh, 120px); display: flex; gap: clamp(10px, 1.6vw, 26px); align-items: flex-end; overflow: hidden; padding: 4px 4px 2px; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+.roster-row .cm { height: auto; animation: rosterBob 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * -0.37s); }
+.roster-row .cm-body { height: 1em; }
+.roster-row .cm-eye b { animation: rosterWobble 1.9s ease-in-out infinite; animation-delay: calc(var(--i) * -0.23s); }
+@keyframes rosterBob { 50% { transform: translate3d(0, -6%, 0) rotate(2deg); } }
+@keyframes rosterWobble { 0%, 100% { transform: translate3d(0, 30%, 0); } 30% { transform: translate3d(-28%, 18%, 0); } 60% { transform: translate3d(26%, 22%, 0); } }
+.idle { grid-template-rows: 1fr auto; }
+
+/* Karaoke crowd along the bottom of the show screen */
+.crowd { --h: clamp(70px, 13vh, 150px); position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; justify-content: space-evenly; align-items: flex-end; padding: 0 2vw; pointer-events: none;
+  opacity: 0; transform: translate3d(0, 60%, 0); transition: opacity 0.5s var(--ease), transform 0.7s var(--spring); }
+.crowd.on { opacity: 1; transform: translate3d(0, 28%, 0); }
+.crowd .cm { flex: 0 0 auto; }
+@media (max-width: 900px) { .crowd { --h: 56px; } .crowd .cm:nth-child(n+7) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .roster-row .cm, .roster-row .cm-eye b { animation: none; } }
+/* Idle fits the roster strip on short projector screens */
+.idle { padding-top: 4vh; padding-bottom: 3vh; row-gap: 2vh; }
+.idle .title { font-size: clamp(56px, min(11vw, 16vh), 190px); }
+.idle .tagline { margin-top: 2vh; }
+.idle .cta { margin-top: 2.6vh; }
+.idle .mini-board { margin-top: 2vh; }
+.idle .qr { width: min(26vw, 300px, 30vh); }
+/* Verdict panel + Again button stay above the crowd */
+body[data-screen="result"] .right-col { z-index: 6; }

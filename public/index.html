@@ -41,7 +41,12 @@
       <div class="qr" id="qr"></div>
       <p class="phone-label">Open on your phone</p>
       <p class="phone-url" id="phoneUrl">checking&hellip;</p>
+      <p class="phone-hint" id="phoneHint"></p>
       <p class="phone-usb">USB: <b>localhost:5173/mic.html</b></p>
+    </div>
+    <div class="roster" id="roster">
+      <p class="roster-title">Characters<span id="rosterCount"></span></p>
+      <div class="roster-row" id="rosterRow"></div>
     </div>
   </section>
 
@@ -50,12 +55,26 @@
     <div class="char-col">
       <div class="char-wrap" id="charWrap">
         <div class="char-glow"></div>
-        <div class="char" id="char">
-          <img id="charImg" alt="">
-          <div class="face">
-            <div class="eye l"><div class="pupil"></div></div>
-            <div class="eye r"><div class="pupil"></div></div>
-            <div class="mouth" id="mouth"><div class="tongue"></div></div>
+        <img id="charImg" class="probe" alt="">
+        <div class="rig" id="rig">
+          <div class="limb leg l" id="legL"><div class="seg a"><div class="seg b"><div class="shoe"></div></div></div></div>
+          <div class="limb leg r" id="legR"><div class="seg a"><div class="seg b"><div class="shoe"></div></div></div></div>
+          <div class="body" id="body">
+            <svg class="sticker" id="sticker" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+              <defs><clipPath id="stickerClip"><polygon id="clipPoly" points=""/></clipPath></defs>
+              <polygon class="outline" id="outlinePoly" points=""/>
+              <image id="stickerImg" x="0" y="0" width="1000" height="1000" preserveAspectRatio="none" clip-path="url(#stickerClip)"/>
+            </svg>
+            <div class="face" id="face">
+              <div class="geye" id="eyeL"><div class="pupil"></div><div class="lid"></div></div>
+              <div class="geye" id="eyeR"><div class="pupil"></div><div class="lid"></div></div>
+              <div class="gmouth" id="gmouth">
+                <div class="smile" id="mouthSmile"></div>
+                <div class="mouth" id="mouth"><div class="teeth"></div><div class="tongue"></div></div>
+              </div>
+            </div>
+            <div class="limb arm l" id="armL"><div class="seg a"><div class="seg b"><div class="glove"><div class="micprop" id="micProp"></div></div></div></div></div>
+            <div class="limb arm r" id="armR"><div class="seg a"><div class="seg b"><div class="glove"></div></div></div></div>
           </div>
         </div>
       </div>
@@ -103,6 +122,7 @@
     </div>
 
     <div class="judging" id="judging"><div class="spinner"></div><p>Judging you&hellip;</p></div>
+    <div class="crowd" id="crowd" aria-hidden="true"></div>
   </section>
 
   <canvas id="confetti" aria-hidden="true"></canvas>

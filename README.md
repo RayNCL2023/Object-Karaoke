@@ -10,9 +10,9 @@ Built today at Hacktoberfest Hack Day Manchester (11 October 2026), all code wri
 
 1. **Snap.** The phone (`/mic.html`) takes a photo and sends it to the laptop.
 2. **Wake up.** Gemma 4 looks at the photo, checks memory for objects it has met before, and writes a character plus a short duet song (title, genre, tempo, alternating lines) as JSON.
-3. **Sing.** ElevenLabs gives the object its voice. The stage (`/`, on the laptop or projector) shows the object as a cartoon face with a moving mouth, plays a Tone.js backing beat, and runs the lyrics karaoke-style.
-4. **Your turn.** On your lines the phone buzzes and records you. ElevenLabs speech-to-text checks how many of your words it heard.
-5. **The verdict.** Gemma writes a two-sentence Manc roast and a score, the object says it out loud, confetti, leaderboard.
+3. **It starts on you.** It's a freestyle roast battle, not a scripted song. ElevenLabs gives the object its voice and it raps a savage opening verse at you over a Tone.js beat, while the stage (`/`, on the laptop or projector) animates it with googly eyes and a moving mouth.
+4. **Your turn, no lyrics.** The phone buzzes and you get 12 seconds to make up a comeback on the spot. ElevenLabs speech-to-text hears what you actually said, the stage shows it, and Gemma writes the object's comeback twisting your own words back at you. Three rounds.
+5. **The verdict.** Gemma judges only what you said: Wit, Rhymes, Comebacks and Confidence out of 10, a score out of 100, and a roast quoting your best (or worst) line, spoken out loud. Confetti, leaderboard. (There's also a Karaoke mode: an original song, you sing every line, scored on accuracy.)
 6. **It remembers.** OpenLoft's NMAFC memory stores every duet. Snap the same thing again and it says "Back for more, are we?"
 
 ## Run it

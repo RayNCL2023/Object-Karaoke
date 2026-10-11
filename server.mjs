@@ -2,6 +2,8 @@
 // Serves public/ and a small API so the page (and a phone) can use Gemma 4, ElevenLabs and NMAFC memory.
 // API keys stay here on the server; the browser never sees them.
 import http from "node:http";
+import https from "node:https";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -154,7 +156,7 @@ const routes = {
   "GET /api/status": async (req, res) => {
     let memory = false;
     try { await mem("/v1/memories/search", { agent_id: agent(), query: "ping", limit: 1 }, 3000); memory = true; } catch { /* not running */ }
-    sendJson(res, 200, { gemma: !!env("GEMINI_API_KEY"), elevenlabs: !!elevenKey(), memory, phoneUrl: phoneUrl(), micUrl: phoneUrl().replace("/phone.html", "/mic.html"), mock: env("MOCK") === "1" });
+    sendJson(res, 200, { gemma: !!env("GEMINI_API_KEY"), elevenlabs: !!elevenKey(), memory, phoneUrl: phoneUrl(), micUrl: httpsReady ? micHttpsUrl() : phoneUrl().replace("/phone.html", "/mic.html"), mock: env("MOCK") === "1", mode: duet.getMode?.() || "battle" });
   },
 };
 
@@ -165,7 +167,23 @@ function lanIp() {
 }
 const phoneUrl = () => `http://${lanIp()}:${PORT}/phone.html`;
 
-http.createServer(async (req, res) => {
+// Phones only allow the microphone on a secure page, so the same app is also served over HTTPS on PORT+1
+// with a self-signed certificate (made once with openssl into certs/). The phone taps "Advanced > Proceed" once.
+const HTTPS_PORT = PORT + 1;
+const micHttpsUrl = () => `https://${lanIp()}:${HTTPS_PORT}/mic.html`;
+let httpsReady = false;
+function certificate() {
+  const dir = path.join(here, "certs");
+  const key = path.join(dir, "key.pem"), cert = path.join(dir, "cert.pem");
+  if (!fs.existsSync(key) || !fs.existsSync(cert)) {
+    fs.mkdirSync(dir, { recursive: true });
+    execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "30",
+      "-subj", "/CN=duet-anything", "-addext", `subjectAltName=IP:${lanIp()},DNS:localhost`], { stdio: "ignore" });
+  }
+  return { key: fs.readFileSync(key), cert: fs.readFileSync(cert) };
+}
+
+async function handle(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   const route = routes[`${req.method} ${urlPath}`];
   if (!route && req.method === "GET" && duet.serveCache(urlPath, res)) return;
@@ -178,7 +196,16 @@ http.createServer(async (req, res) => {
   if (!file.startsWith(path.join(here, "public")) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return res.writeHead(404).end("Not found");
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
   fs.createReadStream(file).pipe(res);
-}).listen(PORT, "0.0.0.0", () => {
+}
+
+try {
+  https.createServer(certificate(), handle).listen(HTTPS_PORT, "0.0.0.0", () => {
+    httpsReady = true;
+    console.log(`Mic:   ${micHttpsUrl()}  (phone on the same Wi-Fi; tap Advanced > Proceed once)`);
+  });
+} catch (e) { console.log(`HTTPS off (${e.message}); phone mic needs USB: adb reverse tcp:${PORT} tcp:${PORT}`); }
+
+http.createServer(handle).listen(PORT, "0.0.0.0", () => {
   console.log(`App:   http://localhost:${PORT}`);
   console.log(`Phone: ${phoneUrl()}  (same Wi-Fi)  or USB: adb reverse tcp:${PORT} tcp:${PORT} then http://localhost:${PORT}/phone.html`);
   if (env("MOCK") === "1") console.log("MOCK=1: canned character + song, silent MP3s, no paid calls");

@@ -43,7 +43,7 @@ async function ensureMic() {
   if (state.stream) return state.stream;
   if (!micSupported()) {
     if (!state.micUnavailableSent) { state.micUnavailableSent = true; broadcast({ type: "mic-unavailable", reason: window.isSecureContext ? "no-recorder" : "insecure" }); }
-    micTip(`Mic needs USB: plug in and open <code>localhost:5173/mic.html</code><br>The stage will use the laptop mic instead.`);
+    micTip(`Mic blocked on this link. Open the <b>https://</b> link shown on the stage (tap Advanced → Proceed once).<br>The stage will use the laptop mic for now.`);
     return null;
   }
   if (state.micAsked && !state.stream) return null;
@@ -53,7 +53,7 @@ async function ensureMic() {
     return state.stream;
   } catch (e) {
     if (!state.micUnavailableSent) { state.micUnavailableSent = true; broadcast({ type: "mic-unavailable", reason: e.name || "denied" }); }
-    micTip("No mic access (permission blocked). The stage will use the laptop mic instead.");
+    micTip("Mic permission was blocked. Tap the lock icon in the address bar → Permissions → Microphone → Allow, then reload.<br>The stage will use the laptop mic for now.");
     return null;
   }
 }
@@ -107,7 +107,8 @@ function onSongReady(session, mine = false) {
   if (pic) $("avatar").src = pic; else $("avatar").removeAttribute("src");
   $("charName").textContent = session.character?.name || session.object || "Your duet partner";
   $("songTitle").textContent = session.song?.title ? `"${session.song.title}"${session.song.genre ? " · " + session.song.genre : ""}` : "";
-  $("readyHint").textContent = session.returning ? "Back for more, are we? Watch the big screen." : "Watch the big screen. Your lines pop up here.";
+  const battle = session.mode !== "karaoke";
+  $("readyHint").textContent = session.returning ? "Back for more, are we? Watch the big screen." : battle ? "Roast battle! Listen to its opener, then freestyle back into this phone. No lyrics, make it up." : "Karaoke! Lyrics are on the big screen. This phone is your mic.";
   buzz(mine ? [80, 60, 80] : 60);
   show("readyScreen");
   ensureMic();
@@ -115,18 +116,23 @@ function onSongReady(session, mine = false) {
 
 // ---------- 3. Record ----------
 let ctx, analyser, raf;
-function lineTextFor(ev) {
-  if (typeof ev.text === "string") return ev.text;
-  if (typeof ev.line === "string") return ev.line;
-  return state.session?.song?.lines?.[ev.line]?.text || "Sing your heart out!";
-}
+// Phone never shows lyrics: battle = freestyle (no lyrics at all), karaoke = lyrics live on the big screen.
+const isBattle = () => state.session?.mode !== "karaoke";
+let countdownTimer = null;
 async function onRecordStart(ev) {
   if (state.recording) return;
   const ms = Math.max(1000, Number(ev.ms) || 4000);
   const lineIndex = typeof ev.line === "number" ? ev.line : ev.index;
   if (ev.id) state.id = ev.id;
   buzz([60, 40, 60]);
-  $("lineText").textContent = lineTextFor(ev);
+  const yl = document.querySelector("#recScreen .yourline");
+  if (yl) yl.textContent = isBattle() ? `FREESTYLE! Roast it back 🎤${ev.round ? ` · Round ${ev.round}` : ""}` : "SING! 🎤";
+  clearInterval(countdownTimer);
+  if (isBattle()) { // big seconds countdown instead of lyrics
+    const end = Date.now() + ms;
+    const tick = () => { const left = Math.max(0, Math.ceil((end - Date.now()) / 1000)); $("lineText").textContent = left ? String(left) : "TIME!"; if (!left) clearInterval(countdownTimer); };
+    tick(); countdownTimer = setInterval(tick, 250);
+  } else $("lineText").textContent = "";
   show("recScreen");
   const stream = await ensureMic();
   // Timer bar runs either way so the singer knows how long they've got.
@@ -143,18 +149,20 @@ async function onRecordStart(ev) {
   rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const stopped = new Promise((r) => (rec.onstop = r));
   rec.start();
-  setTimeout(() => rec.state !== "inactive" && rec.stop(), ms + 300);
+  setTimeout(() => rec.state !== "inactive" && rec.stop(), isBattle() ? ms + 300 : ms + 50); // karaoke: free the mic before the next line starts
   await stopped;
   stopMeter();
   state.recording = false;
   const blob = new Blob(chunks, { type: rec.mimeType || mime || "audio/webm" });
-  sent(DONE_QUIPS[Math.floor(Math.random() * DONE_QUIPS.length)], "Sending your bit...");
+  const battle = isBattle();
+  clearInterval(countdownTimer);
+  if (battle) sent("Bars sent! 🔥", "It's cooking up a comeback... watch the stage.");
   try {
     const audio = await toBase64(blob);
-    const r = await postJson("/api/take", { id: state.id, line: lineIndex, audio, mime: blob.type });
-    if (state.screen === "sentScreen") $("sentText").textContent = r?.accuracy != null ? `Heard ${Math.round(r.accuracy * 100)}% of it. Keep watching the stage.` : "Got your bit. Keep watching the stage.";
+    const r = await postJson("/api/take", { id: state.id, line: lineIndex, round: lineIndex, audio, mime: blob.type });
+    if (battle && state.screen === "sentScreen") $("sentText").textContent = r?.transcript ? `It heard: "${String(r.transcript).slice(0, 120)}". Brace yourself.` : "It heard... nothing. It's going to destroy you for that.";
   } catch (err) {
-    if (state.screen === "sentScreen") $("sentText").textContent = "Couldn't send that one - carry on!";
+    if (battle && state.screen === "sentScreen") $("sentText").textContent = "Couldn't send that one - carry on!";
   }
 }
 function sent(title, text) { $("sentTitle").textContent = title; $("sentText").textContent = text; show("sentScreen"); }
@@ -220,5 +228,10 @@ function connect() {
     }
   };
 }
-connect();
-if (!micSupported()) micTip(`Mic needs USB: plug in and open <code>localhost:5173/mic.html</code><br>The stage will use the laptop mic instead.`);
+// The phone only allows the mic on a secure page: jump from the plain Wi-Fi link to the HTTPS one (port + 1).
+if (!window.isSecureContext && location.protocol === "http:") {
+  location.replace(`https://${location.hostname}:${Number(location.port || 80) + 1}${location.pathname}${location.search}`);
+} else {
+  connect();
+  if (!micSupported()) micTip(`Mic blocked on this link. Open the <b>https://</b> link shown on the stage (tap Advanced → Proceed once).<br>The stage will use the laptop mic for now.`);
+}
