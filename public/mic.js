@@ -1,5 +1,5 @@
 // Duet Anything - phone mic. Snap an object, then sing your lines into the phone when the stage says so.
-import { openMicTest, micPassed, paintChips, micTestOpen, closeMicTest } from "./mictest.js";
+import { openMicTest, micPassed, paintChips, micTestOpen, closeMicTest, getMicStream } from "./mictest.js";
 import { listen as listenEvents } from "./events.js";
 const $ = (id) => document.getElementById(id);
 const QUIPS = [
@@ -37,6 +37,16 @@ const CLIENT = (() => {
   if (!c) { c = "c_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); try { localStorage.setItem("duetClientId", c); } catch { /* ignore */ } }
   return c;
 })();
+// Clock sync with the server (record-start carries startAt in server time): offset = server - phone, best of 3 by round trip.
+let clockOffset = 0;
+async function syncClock() {
+  let best = Infinity;
+  for (let i = 0; i < 3; i++) {
+    try { const t0 = Date.now(); const r = await fetch("/api/time", { cache: "no-store" }); const { now } = await r.json(); const t1 = Date.now(); if (Number.isFinite(now) && t1 - t0 < best) { best = t1 - t0; clockOffset = now - (t0 + t1) / 2; } } catch { /* offline: keep the last offset */ }
+  }
+}
+syncClock(); setInterval(syncClock, 60000);
+let armedRound = null; // a record-start we're counting down to (stops a duplicate starting twice)
 // A record-start aimed at another phone (by client id or player id) is not ours. No target = everyone records (old flow).
 const forOther = (ev) => !!((ev.client && ev.client !== CLIENT) || (player && ev.player && ev.player !== player.id));
 
@@ -71,6 +81,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 let ctx;
 function unlockAudio() {
   try {
+    if (ctx?.state === "closed") ctx = null;
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state !== "running") ctx.resume?.();
   } catch { /* no Web Audio */ }
@@ -126,7 +137,7 @@ async function askMic() {
   if (state.micAsked && !state.stream) return null;
   state.micAsked = true;
   try {
-    state.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    state.stream = await getMicStream(); // echoCancellation off: on Android it switches to call audio and the meter/take go flat
     return state.stream;
   } catch (e) {
     if (!state.micUnavailableSent) { state.micUnavailableSent = true; broadcast({ type: "mic-unavailable", reason: e.name || "denied", client: CLIENT, player: player?.id }); }
@@ -162,6 +173,7 @@ $("cam").addEventListener("change", async (e) => {
     $("wakeThumb").classList.remove("hidden");
     const mock = new URLSearchParams(location.search).has("mock") ? "?mock=1" : "";
     const session = await postJson(`/api/object${mock}`, { image, client: CLIENT, ...(player ? { player: player.id } : {}) });
+    if (session?.ovo) { clearInterval(state.quipTimer); window.dispatchEvent(new CustomEvent("ovo-snapped", { detail: session })); return; } // OBJECT vs OBJECT: ovo-phone.js
     onSongReady(session, true);
   } catch (err) {
     showError(err.message);
@@ -216,7 +228,8 @@ function runMicTest(auto = false) {
   if (state.recording) return;
   openMicTest({
     auto,
-    getStream: ensureMic,
+    // Fresh stream from this tap: the one grabbed right after the camera can be live-but-silent on Samsung.
+    getStream: () => { releaseMic(); return ensureMic(); },
     audioCtx: () => { unlockAudio(); return ctx; },
     report: (ok) => broadcast({ type: "mic-check", client: CLIENT, player: player?.id, playerName: player?.name, ok }),
   });
@@ -231,21 +244,43 @@ const isBattle = () => state.session?.mode !== "karaoke";
 let countdownTimer = null;
 async function onRecordStart(ev) {
   if (forOther(ev)) { // someone else's turn: stay put, show who's on
-    if (!state.recording && state.session) { $("readyHint").textContent = `${ev.playerName || "Someone else"} is on the mic. Get your bars ready...`; show("readyScreen"); }
+    if (!state.recording && state.session) { $("readyHint").textContent = `WAITING — ${String(ev.playerName || "the other player").toUpperCase()}'S TURN. Watch the big screen and get your comeback ready...`; show("readyScreen"); }
     return;
   }
   if (state.recording) return;
   const ms = Math.max(1000, Number(ev.ms) || 4000);
   const lineIndex = typeof ev.line === "number" ? ev.line : ev.index;
   if (ev.id) state.id = ev.id;
-  buzz([60, 40, 60]);
+  const armKey = `${ev.id || state.id}:${lineIndex}`;
+  if (armedRound === armKey) return;
+  // Stage sends record-start at the start of its 3-2-1 (leadMs): mirror the countdown, open the mic exactly at startAt.
+  const startLocal = ev.leadMs && Number(ev.startAt) ? Number(ev.startAt) - clockOffset : Date.now();
+  const lateBy = Math.max(0, Date.now() - startLocal); // arrived after the window opened: record the rest of it
+  if (startLocal - Date.now() > 150) {
+    armedRound = armKey;
+    buzz([60, 40, 60]);
+    if (micTestOpen()) closeMicTest();
+    ensureMic(); // warm the mic during the countdown
+    const yl0 = document.querySelector("#recScreen .yourline");
+    if (yl0) yl0.textContent = "YOUR TURN IN";
+    $("lineText").textContent = "";
+    const cb0 = $("countBig");
+    clearInterval(countdownTimer);
+    const tick0 = () => { const left = Math.max(0, Math.ceil((startLocal - Date.now()) / 550)); cb0.textContent = left ? String(Math.min(3, left)) : "GO!"; cb0.classList.remove("small"); };
+    tick0(); countdownTimer = setInterval(tick0, 100);
+    show("recScreen");
+    while (Date.now() < startLocal - 20) await new Promise((r) => setTimeout(r, Math.min(50, Math.max(5, startLocal - Date.now()))));
+    clearInterval(countdownTimer);
+    if (armedRound !== armKey) return; // reset during the countdown
+  } else buzz([60, 40, 60]);
+  armedRound = null;
   const yl = document.querySelector("#recScreen .yourline");
   if (yl) yl.textContent = isBattle() ? (ev.round ? `ROUND ${String(ev.round).padStart(2, "0")} · SPIT` : "FREESTYLE") : "SING";
   clearInterval(countdownTimer);
   $("lineText").textContent = "";
   const cb = $("countBig");
   if (isBattle()) { // huge seconds countdown over the mic head instead of lyrics
-    const end = Date.now() + ms;
+    const end = Date.now() + ms - lateBy;
     const tick = () => { const left = Math.max(0, Math.ceil((end - Date.now()) / 1000)); cb.textContent = left ? String(left) : "TIME!"; cb.classList.toggle("small", !left); if (!left) clearInterval(countdownTimer); };
     tick(); countdownTimer = setInterval(tick, 250);
   } else { cb.textContent = ""; cb.classList.remove("small"); }
@@ -256,7 +291,7 @@ async function onRecordStart(ev) {
   // Timer bar runs either way so the singer knows how long they've got.
   const bar = $("timer");
   bar.style.transition = "none"; bar.style.transform = "scaleX(1)";
-  requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `transform ${ms}ms linear`; bar.style.transform = "scaleX(0)"; }));
+  requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `transform ${Math.max(500, ms - lateBy)}ms linear`; bar.style.transform = "scaleX(0)"; }));
   if (!stream) { setTimeout(() => sent("Laptop's got this one.", "Sing at the laptop - it's listening."), ms); return; }
 
   state.recording = true;
@@ -276,7 +311,7 @@ async function onRecordStart(ev) {
   startMeter(cur, (lv) => { peak = Math.max(peak, lv); });
   state.rec = take?.rec; // small Stop button on the mic screen can end the take early
   state.stopTake = () => { stopEarly = true; };
-  let endAt = Date.now() + (battle ? ms + 300 : ms + 50); // karaoke: free the mic before the next line starts
+  let endAt = Math.max(Date.now() + 1500, startLocal + (battle ? ms + 300 : ms + 50)); // karaoke: free the mic before the next line starts
   const audioRunning = () => !!ctx && ctx.state === "running";
   // Silence watchdog: flat level for the first 2.5 s -> re-grab the mic once, then tell the stage if still silent.
   const fix = async () => {
@@ -284,7 +319,8 @@ async function onRecordStart(ev) {
     refixed = true;
     deaf("WE CAN'T HEAR YOU — FIXING THE MIC…");
     try { if (take && take.rec.state !== "inactive") take.rec.stop(); } catch { /* ignore */ }
-    stopMeter(); releaseMic(); unlockAudio();
+    stopMeter(); releaseMic();
+    try { ctx?.close(); } catch { /* ignore */ } ctx = null; unlockAudio(); // a frozen context reads flat forever: start a new one
     try { await ctx?.resume?.(); } catch { /* ignore */ }
     const s2 = await ensureMic();
     if (!s2 || !state.recording) return;
@@ -399,7 +435,7 @@ function onVerdict(ev) {
   buzz(score >= 70 ? [100, 50, 100, 50, 300] : score >= 40 ? [200, 100, 200] : [600]);
 }
 function reset() {
-  state.session = null; state.id = null;
+  state.session = null; state.id = null; armedRound = null;
   if (!state.recording) show("snapScreen");
 }
 $("againBtn").addEventListener("click", () => { broadcast({ type: "reset" }); reset(); });

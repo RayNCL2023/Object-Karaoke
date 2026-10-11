@@ -43,7 +43,8 @@ export function createCaptions({ lyrics, track, onWord }) {
 
   function reset(newLines = [], name = "") {
     lines.length = 0;
-    newLines.forEach((l) => lines.push({ who: l.who === "you" ? "you" : "obj", text: l.text, name, kind: l.who === "you" ? "sing" : "obj" }));
+    // Karaoke parts: each line can carry its singer (P1/P2/ALL/AI) name + colour, shown as "DEBS:" in their colour.
+    newLines.forEach((l) => lines.push({ who: l.who === "you" ? "you" : "obj", text: l.text, name, kind: l.who === "you" ? "sing" : "obj", singer: l.singerName || "", colour: l.singerColour || "", part: l.part || "" }));
     track.innerHTML = "";
     cur = null;
     nextEl.textContent = "";
@@ -65,7 +66,8 @@ export function createCaptions({ lyrics, track, onWord }) {
     const el = document.createElement("div");
     el.className = `cap current ${kind}`;
     el.dataset.i = i;
-    const label = kind === "obj" ? esc(line.name || "") : kind === "said" ? "&#127908; You said" : "&#127908; Your line";
+    const label = line.singer ? `${esc(String(line.singer).toUpperCase())}:` : kind === "obj" ? esc(line.name || "") : kind === "said" ? "&#127908; You said" : "&#127908; Your line";
+    if (line.colour) { el.style.setProperty("--singer", line.colour); el.classList.add("parted"); }
     el.innerHTML = `<div class="cap-who">${label}</div>` + chunks.map((c, ci) =>
       `<div class="chunk" data-c="${ci}">${c.map((w) => `<span class="w${w.punch ? " punch" : ""}" data-k="${w.i}"><span class="wi">${esc(w.w)}</span></span>`).join(" ")}</div>`).join("");
     track.appendChild(el);
@@ -73,7 +75,12 @@ export function createCaptions({ lyrics, track, onWord }) {
     words.forEach((w) => { w.el = el.querySelector(`.w[data-k="${w.i}"]`); });
     cur = { i, el, kind, words, chunkEls, shown: -1, revealed: 0, mode: "wait", start: 0, dur: 0, audio: null, boundary: -1, boundaryAt: 0, punchFired: false };
     // Karaoke: you need to read ahead, so the first chunk shows (grey) straight away, plus a next-line preview
-    if (kind === "sing") { showChunk(0); const nx = lines[i + 1]; nextEl.textContent = nx ? nx.text : ""; nextEl.classList.toggle("on", !!nx); }
+    if (kind === "sing" || line.part) {
+      if (kind === "sing") showChunk(0);
+      const nx = lines.slice(i + 1).find((l) => l.kind !== "said");
+      nextEl.innerHTML = nx ? (nx.singer ? `<b style="color:${esc(nx.colour || "inherit")}">UP NEXT · ${esc(String(nx.singer).toUpperCase())}:</b> ${esc(nx.text)}` : esc(nx.text)) : "";
+      nextEl.classList.toggle("on", !!nx);
+    }
     else { nextEl.classList.remove("on"); }
     if (kind === "said") start(i, Math.max(900, words.length * 140), "type");
   }

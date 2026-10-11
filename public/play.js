@@ -6,6 +6,14 @@ const save = (o) => { try { localStorage.setItem(STORE, JSON.stringify(o)); } ca
 const buzz = (p) => { try { navigator.vibrate?.(p); } catch { /* not supported */ } };
 let me = load(); // { playerId, name, code }
 
+// Phones only allow the mic on a secure page: if someone opened the plain http Wi-Fi link (e.g. scanned the QR
+// before the public link was ready), ask the server for the secure link and jump to it.
+if (!window.isSecureContext && location.protocol === "http:" && !/^(localhost|127\.)/.test(location.hostname)) {
+  fetch("/api/status").then((r) => r.json()).then((s) => {
+    const secure = s.publicUrl ? `${s.publicUrl}/play` : `https://${location.hostname}:${Number(location.port || 80) + 1}/play`;
+    location.replace(secure + location.search);
+  }).catch(() => location.replace(`https://${location.hostname}:${Number(location.port || 80) + 1}/play${location.search}`));
+}
 const qs = new URLSearchParams(location.search);
 $("code").value = (qs.get("code") || me.code || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
 $("name").value = me.name || qs.get("name") || "";

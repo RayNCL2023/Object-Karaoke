@@ -2,7 +2,35 @@
 // plays it back, plain fixes if silent. Passing marks the phone "MIC OK" (localStorage) and tells the stage
 // ({type:'mic-check', client, player, playerName, ok}). Used by mic.html (shared stream) and play.html (own stream).
 const OK_KEY = "duetMicOk";
-const PASS_LEVEL = 0.08, PASS_MS = 500, REC_MS = 2500, FAIL_MS = 6000;
+const PASS_LEVEL = 0.05, PASS_MS = 500, REC_MS = 2500, FAIL_MS = 6000;
+
+/** Phone mic constraints: echo cancellation off (on Android it flips audio into call mode, which can freeze Web Audio
+ *  and hand back near-silence on Samsung), noise suppression off, auto gain on so quiet voices still register. */
+export const MIC_CONSTRAINTS = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } };
+export async function getMicStream() {
+  try { return await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS); }
+  catch (e) { if (e?.name === "NotAllowedError" || e?.name === "SecurityError") throw e; return navigator.mediaDevices.getUserMedia({ audio: true }); }
+}
+/** Raw RMS (0-1) of a recorded blob, decoded offline: proves sound even when the live meter can't run. 0 on failure. */
+async function blobLevel(blob) {
+  try {
+    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const dec = new AC(1, 1, 44100);
+    const bytes = await blob.arrayBuffer();
+    const ab = await new Promise((res, rej) => { const p = dec.decodeAudioData(bytes, res, rej); p?.then?.(res, rej); });
+    const d = ab.getChannelData(0); let sum = 0, n = 0;
+    for (let i = Math.floor(d.length * 0.1); i < d.length; i++) { sum += d[i] * d[i]; n++; } // skip the start click
+    return n ? Math.sqrt(sum / n) : 0;
+  } catch { return 0; }
+}
+/** 0.1 s silent WAV, played inside the tap so iPhone lets the same <audio> play the recording later. */
+const SILENT_WAV = (() => {
+  const n = 4410, b = new DataView(new ArrayBuffer(44 + n * 2)), w = (o, s) => [...s].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); b.setUint32(4, 36 + n * 2, true); w(8, "WAVEfmt "); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true);
+  b.setUint32(24, 44100, true); b.setUint32(28, 88200, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); w(36, "data"); b.setUint32(40, n * 2, true);
+  let bin = ""; new Uint8Array(b.buffer).forEach((x) => { bin += String.fromCharCode(x); });
+  return "data:audio/wav;base64," + btoa(bin);
+})();
 
 export const micPassed = () => { try { return Number(localStorage.getItem(OK_KEY) || 0) > Date.now() - 6 * 3600e3; } catch { return false; } };
 const setPassed = (ok) => { try { ok ? localStorage.setItem(OK_KEY, String(Date.now())) : localStorage.removeItem(OK_KEY); } catch { /* private mode */ } };
@@ -31,6 +59,8 @@ const CSS = `
 .mt-btn.alt { background:#fff; }
 .mt-btn:active { transform:translate(3px,3px); box-shadow:2px 2px 0 #111; }
 .mt-note { font-size:13px; margin:0; }
+.mt-dbg { font:400 11px/1.35 "Space Mono", monospace; color:#777; margin:0; word-break:break-word; }
+.mt-card .hidden { display:none; }
 .mt-chip { display:inline-block; font:700 12px "Space Mono", monospace; letter-spacing:.06em; text-transform:uppercase; padding:1px 7px; border:2px solid #111; margin-left:6px; vertical-align:1px; }
 .mt-chip.ok { background:#1f9d55; color:#fff; }
 .mt-chip.no { background:#fff; color:#111; }
@@ -73,78 +103,133 @@ export function openMicTest(opts = {}) {
     <div class="mt-status" id="mtStatus">Ready?</div>
     <div class="mt-meter"><b id="mtBar"></b><i></i></div>
     <div id="mtFix"></div>
+    <button class="mt-btn alt hidden" id="mtPlay" type="button">▶ Play it back</button>
     <div class="mt-row"><button class="mt-btn" id="mtGo" type="button">Start</button><button class="mt-btn alt" id="mtDone" type="button">Close</button></div>
+    <p class="mt-dbg" id="mtDbg"></p>
   </div>`;
   document.body.appendChild(wrap);
   const $ = (id) => wrap.querySelector("#" + id);
-  let raf = 0, rec = null, own = null, nodes = [], timers = [], passed = false, running = false;
+  let raf = 0, rec = null, own = null, nodes = [], timers = [], passed = false, running = false, ctx = null, dbg = 0, player = null, playUrl = "";
+  let rawNow = 0, rawPeak = 0, curStream = null, lastCt = -1, stalls = 0;
   const status = (t, cls = "") => { const el = $("mtStatus"); el.textContent = t; el.className = `mt-status ${cls}`; };
+  function paintDebug() {
+    const t = curStream?.getAudioTracks?.()[0];
+    const s = t?.getSettings?.() || {};
+    $("mtDbg").textContent = `audio ${ctx ? ctx.state + " " + Math.round(ctx.sampleRate) + "Hz t=" + ctx.currentTime.toFixed(1) : "none"} | track ${t ? t.readyState + (t.muted ? " MUTED" : "") + (t.enabled ? "" : " disabled") : "none"}`
+      + `${s.sampleRate ? " " + s.sampleRate + "Hz" : ""} ec:${s.echoCancellation ? 1 : 0} ns:${s.noiseSuppression ? 1 : 0} | rms ${rawNow.toFixed(3)} peak ${rawPeak.toFixed(3)} (need ${(PASS_LEVEL / 4).toFixed(3)})`;
+  }
   function cleanup() {
-    cancelAnimationFrame(raf); timers.forEach(clearTimeout); timers = [];
+    if (dbg) { try { paintDebug(); } catch { /* ignore */ } } // freeze the last reading on screen
+    clearInterval(raf); clearInterval(dbg); timers.forEach(clearTimeout); timers = [];
     try { if (rec && rec.state !== "inactive") rec.stop(); } catch { /* ignore */ }
+    rec = null;
     nodes.forEach((n) => { try { n.disconnect(); } catch { /* ignore */ } }); nodes = [];
+    if (ctx) { try { ctx.close(); } catch { /* ignore */ } ctx = null; }
     if (own) { own.getTracks().forEach((t) => t.stop()); own = null; }
+    try { player?.pause(); } catch { /* ignore */ }
+    if (playUrl) { URL.revokeObjectURL(playUrl); playUrl = ""; }
+    $("mtPlay").classList.add("hidden");
     running = false;
   }
-  async function start() {
-    if (running) return;
-    cleanup(); running = true; passed = false;
+  /** Analyser on the CURRENT live stream, BEFORE the zero-gain sink (Safari only runs nodes that reach the speakers). */
+  function wire(stream) {
+    nodes.forEach((n) => { try { n.disconnect(); } catch { /* ignore */ } }); nodes = [];
+    const src = ctx.createMediaStreamSource(stream), an = ctx.createAnalyser(); an.fftSize = 1024;
+    const sink = ctx.createGain(); sink.gain.value = 0; src.connect(an); an.connect(sink); sink.connect(ctx.destination);
+    nodes = [src, an, sink];
+    return an;
+  }
+  /** Brand-new context (the old one stalled / stayed suspended) wired to the live stream. */
+  function rebuild(stream) {
+    if (ctx) { try { ctx.close(); } catch { /* ignore */ } }
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state !== "running") ctx.resume?.().catch(() => {});
+    lastCt = -1;
+    return wire(stream);
+  }
+  let runId = 0;
+  async function start() { // START / AGAIN: always a clean restart
+    const my = ++runId;
+    cleanup(); running = true; passed = false; rawNow = rawPeak = 0;
     $("mtFix").innerHTML = ""; $("mtGo").textContent = "Again";
-    let ctx;
-    try { ctx = opts.audioCtx?.() || new (window.AudioContext || window.webkitAudioContext)(); await ctx.resume?.(); } catch { /* no Web Audio */ }
+    // Inside the tap: unlock the page's shared context (used for the take meter), our own context and an <audio> for playback.
+    try { opts.audioCtx?.(); } catch { /* ignore */ }
+    player = new Audio(); player.playsInline = true; player.setAttribute("playsinline", "");
+    try { player.src = SILENT_WAV; player.play().catch(() => {}); } catch { /* ignore */ }
+    try { ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.resume?.().catch(() => {}); } catch { ctx = null; }
+    dbg = setInterval(paintDebug, 250);
     status("Asking for the mic…");
     let stream = null;
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("insecure");
-      stream = opts.getStream ? await opts.getStream() : (own = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }));
+      stream = opts.getStream ? await opts.getStream() : (own = await getMicStream());
     } catch { stream = null; }
+    if (!running || my !== runId) return;
     if (!stream) return fail(window.isSecureContext ? "Mic blocked" : "Mic needs the https link");
+    curStream = stream;
     status("Say something…");
     let above = 0, last = performance.now();
     if (ctx) {
       try {
-        const src = ctx.createMediaStreamSource(stream), an = ctx.createAnalyser(); an.fftSize = 512;
-        const sink = ctx.createGain(); sink.gain.value = 0; src.connect(an); an.connect(sink); sink.connect(ctx.destination);
-        nodes = [src, an, sink];
-        const buf = new Uint8Array(an.fftSize);
-        const tick = (t) => {
-          const lv = levelOf(an, buf);
+        let an = ctx.state === "running" ? wire(stream) : rebuild(stream); // capture is live now, so a new context may run
+        let buf = new Float32Array(an.fftSize), checkAt = performance.now() + 700;
+        const tick = () => { // timer, not rAF: keeps measuring even if the browser throttles animation frames
+          const t = performance.now();
+          if (!running || !ctx) return;
+          an.getFloatTimeDomainData(buf);
+          let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+          rawNow = Math.sqrt(sum / buf.length); rawPeak = Math.max(rawPeak, rawNow);
+          const lv = Math.min(1, rawNow * 4);
           $("mtBar").style.transform = `scaleX(${lv})`;
           if (lv > PASS_LEVEL) above += t - last;
           last = t;
           if (!passed && above >= PASS_MS) pass();
-          raf = requestAnimationFrame(tick);
+          // Suspended or frozen context (Android re-routes audio when the mic opens): resume, then rebuild on the live stream.
+          if (t > checkAt) {
+            checkAt = t + 700;
+            const ct = ctx.currentTime;
+            if ((ctx.state !== "running" || ct === lastCt) && stalls < 4) {
+              stalls++;
+              if (stalls === 1) ctx.resume?.().catch(() => {});
+              else if (curStream?.getAudioTracks?.()[0]?.readyState === "live") { an = rebuild(curStream); buf = new Float32Array(an.fftSize); }
+            }
+            lastCt = ctx.currentTime;
+          }
         };
-        raf = requestAnimationFrame(tick);
-      } catch { /* meter failed; the recording still tells us */ }
+        raf = setInterval(tick, 40);
+      } catch (e) { console.warn("[mic test] meter", e); /* the recording still tells us */ }
     }
-    // Record ~2.5 s and play it back so they hear themselves.
+    // Record ~2.5 s, check the recording itself for sound (works even if the meter can't), then play it back.
     try {
-      const mime = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find((m) => window.MediaRecorder?.isTypeSupported?.(m) && (/iP(hone|ad|od)/.test(navigator.userAgent) || !m.includes("mp4"))) || "";
-      rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const mime = (ios ? ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"] : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]).find((m) => window.MediaRecorder?.isTypeSupported?.(m)) || "";
+      const r = rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       const chunks = [];
-      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-      rec.onstop = async () => {
-        const blob = new Blob(chunks, { type: rec?.mimeType || mime || "audio/webm" });
-        console.log(`[mic test] ${blob.size} bytes ${blob.type}`);
-        if (!running) return;
-        if (blob.size < 2048 && !passed) return fail("Empty recording");
+      r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      r.onstop = async () => {
+        const blob = new Blob(chunks, { type: r.mimeType || mime || "audio/webm" });
+        if (!running || my !== runId) return;
+        const lvRec = await blobLevel(blob);
+        console.log(`[mic test] ${blob.size} bytes ${blob.type}, recording rms ${lvRec.toFixed(4)}`);
+        if (!running || my !== runId) return;
+        if (!passed && lvRec > PASS_LEVEL / 4) pass();
+        if (blob.size < 1024 && !passed) return fail("Empty recording");
         status(passed ? "Got you! ✓ Playing it back…" : "Playing it back…", passed ? "ok" : "");
-        try {
-          if (!ctx) throw new Error("no ctx");
-          const ab = await ctx.decodeAudioData(await blob.arrayBuffer());
-          const s = ctx.createBufferSource(); s.buffer = ab; s.connect(ctx.destination); s.start();
-          s.onended = () => running && done();
-        } catch {
-          try { const a = new Audio(URL.createObjectURL(blob)); a.onended = () => running && done(); await a.play(); } catch { done(); }
+        playUrl = URL.createObjectURL(blob);
+        const p = player || (player = new Audio());
+        p.onended = () => running && done();
+        p.src = playUrl;
+        try { await p.play(); } catch {
+          $("mtPlay").classList.remove("hidden"); // autoplay blocked: one tap plays it
+          status(passed ? "Got you! ✓ Tap PLAY to hear it" : "Tap PLAY to hear it", passed ? "ok" : "");
         }
       };
-      rec.start();
-      timers.push(setTimeout(() => { try { rec.state !== "inactive" && rec.stop(); } catch { /* ignore */ } }, REC_MS));
-    } catch { /* no recorder: the meter alone decides */ }
-    timers.push(setTimeout(() => { if (!passed) fail("Can't hear you"); }, FAIL_MS));
+      r.start(250);
+      timers.push(setTimeout(() => { try { r.state !== "inactive" && r.stop(); } catch { /* ignore */ } }, REC_MS));
+    } catch (e) { console.warn("[mic test] recorder", e); /* no recorder: the meter alone decides */ }
+    timers.push(setTimeout(() => { if (!passed && my === runId) fail("Can't hear you"); }, FAIL_MS));
   }
-  function done() { if (passed) status("Mic OK ✓ You're good to go", "ok"); else if (running) fail("Can't hear you"); running = false; cancelAnimationFrame(raf); }
+  function done() { if (passed) status("Mic OK ✓ You're good to go", "ok"); else if (running) fail("Can't hear you"); running = false; clearInterval(raf); }
   function pass() {
     passed = true; setPassed(true); paintChips();
     status("Got you! ✓", "ok");
@@ -162,6 +247,7 @@ export function openMicTest(opts = {}) {
   function close() { cleanup(); wrap.remove(); open = null; opts.onClose?.(); }
   $("mtGo").addEventListener("click", start);
   $("mtDone").addEventListener("click", close);
+  $("mtPlay").addEventListener("click", () => { if (!player || !playUrl) return; $("mtPlay").classList.add("hidden"); player.currentTime = 0; player.play().catch(() => {}); });
   open = { close };
   return open;
 }

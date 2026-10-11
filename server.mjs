@@ -14,7 +14,9 @@ import { createDuet } from "./lib/duet.mjs";
 import { createAudience } from "./lib/audience.mjs";
 import { createSetup } from "./lib/setup.mjs";
 import { createPlayers } from "./lib/players.mjs";
+import { createKaraoke } from "./lib/karaoke.mjs";
 import { createPvp } from "./lib/pvp.mjs";
+import { createOvo } from "./lib/ovo.mjs";
 
 // App folder (holds public/). The Windows exe sets DUET_APP_DIR to the folder next to DuetAnything.exe;
 // from source it's this file's folder. Never the cwd, so double-clicking from anywhere still finds public/.
@@ -144,22 +146,30 @@ function broadcast(event) {
   const line = `data: ${JSON.stringify(event)}\n\n`;
   for (const res of listeners) { try { res.write(line); } catch { listeners.delete(res); } }
   if (event && typeof event === "object") { recent.push({ seq: ++seq, event }); if (recent.length > 300) recent.shift(); for (const wake of [...pollers]) wake(); }
+  if (event?.type === "audience-react") { try { karaoke.react(event.reaction); } catch { /* not ready */ } } // karaoke crowd score
+  if (event?.type === "song-ready" && event.session && !event.session.parts) { try { karaoke.noteSnap(event.session); } catch { /* not ready */ } } // last snap = karaoke AI partner
   if (event?.type === "verdict" && !event.pvp && active && !active.pvp) { active = null; players.rotate(); } // VS THE OBJECT: next player is up
 }
 // Multi-player: tag record-start with the player whose turn it is (mic.js ignores record-starts meant for someone else).
 let active = null; // { id, pvp, player } = the battle on stage
 function decorate(e) {
   if (!e || typeof e !== "object") return e;
+  if (e.type === "record-start") { // sync: startAt = server time the take window opens (phones correct for clock offset via /api/time)
+    const now = Date.now();
+    if (!e.startAt) e.startAt = now + Math.max(0, Math.min(5000, Number(e.leadMs) || 0));
+    e.serverAt = now;
+  }
   if (e.type === "song-ready" && e.session) {
     const s = e.session;
     if (s.pvp) active = { id: s.id, pvp: true };
+    else if (s.parts) active = { id: s.id, pvp: false, parts: true }; // karaoke parts: the stage targets each record-start itself
     else { const p = players.current(); active = { id: s.id, pvp: false, player: p }; if (p) Object.assign(s, { player: p.id, playerName: p.name, playerColour: p.colour }); }
-  } else if (e.type === "record-start" && !e.player && active) {
+  } else if (e.type === "record-start" && !e.player && !e.all && active && !active.parts) {
     const p = active.pvp ? pvp.turnPlayer(active.id, e.round ?? e.line) : active.player;
     if (p) Object.assign(e, { player: p.id, playerName: p.name, playerColour: p.colour });
     else if (!active.pvp && owners.get(active.id)) e.client = owners.get(active.id); // only the phone that snapped records
   } else if (e.type === "photo-received" && e.id && pendingClient) { owners.set(e.id, pendingClient); pendingClient = null; if (owners.size > 200) owners.delete(owners.keys().next().value); }
-  else if (e.type === "reset") active = null;
+  else if (e.type === "reset") { active = null; try { ovo.reset(); } catch { /* not ready */ } }
   return e;
 }
 
@@ -182,7 +192,7 @@ const sendJson = (res, code, obj) => res.writeHead(code, { "Content-Type": "appl
 // Room code: ROOM_CODE in .env, else the code saved in <data>/cache/room-code.txt (so restarts keep it), else a new one.
 const roomFile = path.join(dataDir, "cache", "room-code.txt");
 const savedRoom = (() => { try { return fs.readFileSync(roomFile, "utf8").trim(); } catch { return ""; } })();
-const sessionInfo = (id) => { if (/^demo_[0-9]{10,16}$/.test(String(id))) return { rounds: 3, done: false }; /* stage offline B demo: crowd can vote */ const s = pvp.get?.(id) || duet.sessions.get(id); return s ? { rounds: s.battle?.rounds || 0, done: !!s.verdict } : null; };
+const sessionInfo = (id) => { if (/^demo_[0-9]{10,16}$/.test(String(id))) return { rounds: 3, done: false }; /* stage offline B demo: crowd can vote */ if (ovo?.has(id)) return ovo.info(id); /* OBJECT vs OBJECT */ const s = pvp.get?.(id) || duet.sessions.get(id); return s ? { rounds: s.battle?.rounds || 0, done: !!s.verdict } : null; };
 const audience = createAudience({ broadcast: (e) => broadcast(e), readJson, sendJson, joinUrl: () => playUrl(), sessionInfo: (id) => sessionInfo(id), code: env("ROOM_CODE") || savedRoom });
 if (!env("ROOM_CODE") && audience.code !== savedRoom) { try { fs.mkdirSync(path.dirname(roomFile), { recursive: true }); fs.writeFileSync(roomFile, audience.code); } catch { /* read-only */ } } // one QR for everyone: /play (BATTLE or JUDGE)
 const setup = createSetup({ here: dataDir, env, readJson, sendJson }); // .env lives in dataDir (DUET_DATA_DIR in the desktop app)
@@ -190,12 +200,14 @@ const duet = createDuet({ here, env, gemma, voices, remember, recall, broadcast:
 
 const players = createPlayers({ broadcast: (e) => broadcast(e), readJson, sendJson, roomCode: () => audience.code });
 const pvp = createPvp({ here, env, gemma, remember, duet, players, broadcast: (e) => broadcast(e), readJson, sendJson, crowdTally: (id) => audience.getTally(id) });
+const karaoke = createKaraoke({ here, env, gemma, duet, players, broadcast: (e) => broadcast(e), readJson, sendJson });
+const ovo = createOvo({ here, env, gemma, remember, duet, players, broadcast: (e) => broadcast(e), readJson, sendJson, crowdTally: (id) => audience.getTally(id) });
 // PvP sessions go to lib/pvp.mjs, everything else to lib/duet.mjs (body read once, handed on via req._body).
 const viaPvp = (name) => async (req, res) => {
   const b = await readJson(req);
   if (name === "take" && !hostOk(req)) { // only the snapping phone (or, in PvP, the player whose turn it is) can send a take
     const owner = owners.get(b.id);
-    if (owner && b.client !== owner && !pvp.has(b.id)) return sendJson(res, 403, { error: "not your battle - only the phone that snapped can rap" });
+    if (owner && b.client !== owner && !pvp.has(b.id) && !karaoke.has(b.id)) return sendJson(res, 403, { error: "not your battle - only the phone that snapped can rap" });
     const turn = pvp.has(b.id) ? pvp.turnPlayer(b.id, b.round ?? b.line) : null;
     if (turn && b.player && b.player !== turn.id) return sendJson(res, 403, { error: "not your turn" });
   }
@@ -204,6 +216,7 @@ const viaPvp = (name) => async (req, res) => {
     if (wait) await new Promise((r) => setTimeout(r, wait));
     audience.close?.(b.id);
   }
+  if (karaoke.has(b.id)) return karaoke[name](b, req, res); // karaoke song sessions (lib/karaoke.mjs)
   if (pvp.has(b.id)) return pvp[name](b, req, res);
   req._body = b;
   return duet.routes[`POST /api/${name}`](req, res);
@@ -220,7 +233,7 @@ async function objectRoute(req, res) {
     if (!res.headersSent) sendJson(res, code, { error: message });
   };
   let timer;
-  const work = players.pvpPair() ? pvp.object(req, res) : duet.routes["POST /api/object"](req, res);
+  const work = players.isOvo?.() ? ovo.object(req, res) : duet.getMode() === "karaoke" && karaoke.armed() ? karaoke.object(req, res) : players.pvpPair() ? pvp.object(req, res) : duet.routes["POST /api/object"](req, res);
   try {
     await Promise.race([work, new Promise((_, rej) => { timer = setTimeout(() => rej(Object.assign(new Error("Took too long waking it up - snap again"), { timeout: true })), OBJECT_TIMEOUT_MS); })]);
   } catch (e) {
@@ -232,14 +245,23 @@ async function objectRoute(req, res) {
 // ---------- host lock: paid / admin endpoints only from the laptop (localhost) or with the per-run HOST_TOKEN ----------
 const HOST_TOKEN = env("HOST_TOKEN") || crypto.randomBytes(16).toString("hex");
 const hostOk = (req) => setup.isLocal(req) || req.headers["x-host-token"] === HOST_TOKEN || new URL(req.url, "http://x").searchParams.get("token") === HOST_TOKEN;
-const HOST_ONLY = /^(POST \/api\/(gemma|speak|sfx|mode|difficulty|match)|GET \/api\/voices|(GET|POST) \/api\/memory\/.*|(GET|POST) \/api\/setup\/.+)$/;
+const HOST_ONLY = /^(POST \/api\/(gemma|speak|sfx|mode|difficulty|match|karaoke\/(pick|start|heckle))|GET \/api\/voices|(GET|POST) \/api\/memory\/.*|(GET|POST) \/api\/setup\/.+)$/;
 
 const routes = {
   ...duet.routes,
   ...players.routes,
+  ...karaoke.routes,
   "POST /api/object": objectRoute,
   "POST /api/take": viaPvp("take"),
   "POST /api/judge": viaPvp("judge"),
+  ...ovo.routes,
+  "POST /api/ovo/judge": async (req, res) => { // { id, waitVotesMs }: let the last votes land, close voting, then judge
+    const b = await readJson(req);
+    const wait = Math.max(0, Math.min(10000, Number(b.waitVotesMs) || 0));
+    if (wait) await new Promise((r) => setTimeout(r, wait));
+    audience.close?.(b.id);
+    return ovo.judge(b, req, res);
+  },
   ...audience.routes,
   ...setup.routes,
   "POST /api/broadcast": async (req, res) => relay(req, res),
@@ -260,6 +282,7 @@ const routes = {
     req.on("close", () => { clearInterval(ping); listeners.delete(res); });
   },
   // GET /api/poll?since=SEQ&wait=MS -> { seq, events: [...] } (waits up to 25 s for something new). since omitted = just the current seq.
+  "GET /api/time": async (req, res) => sendJson(res, 200, { now: Date.now() }), // phone clock-offset probe
   "GET /api/poll": async (req, res) => {
     const q = new URL(req.url, "http://x").searchParams;
     const since = q.has("since") ? Number(q.get("since")) : seq;
@@ -275,7 +298,7 @@ const routes = {
   "GET /api/status": async (req, res) => {
     let memory = false;
     try { await mem("/v1/memories/search", { agent_id: agent(), query: "ping", limit: 1 }, 3000); memory = true; } catch { /* not running */ }
-    sendJson(res, 200, { gemma: !!env("GEMINI_API_KEY"), elevenlabs: !!elevenKey(), memory, phoneUrl: phoneUrl(), micUrl: publicUrl ? `${publicUrl}/mic.html` : httpsReady ? micHttpsUrl() : phoneUrl().replace("/phone.html", "/mic.html"), publicUrl, tunnel: tunnelState, battle: duet.battleCfg?.() || null, ...(setup.isLocal(req) ? { hostToken: HOST_TOKEN } : {}), mock: env("MOCK") === "1", mode: duet.getMode?.() || "battle", difficulty: duet.getDifficulty?.() || "spicy", needsSetup: setup.needsSetup(), roomCode: audience.code, joinUrl: publicUrl ? `${publicUrl}/join.html` : `http://${lanIp()}:${PORT}/join.html`, playUrl: playUrl(), players: players.count() });
+    sendJson(res, 200, { gemma: !!env("GEMINI_API_KEY"), elevenlabs: !!elevenKey(), memory, phoneUrl: phoneUrl(), micUrl: publicUrl ? `${publicUrl}/mic.html` : httpsReady ? micHttpsUrl() : phoneUrl().replace("/phone.html", "/mic.html"), publicUrl, shortUrl, tunnel: tunnelState, battle: duet.battleCfg?.() || null, ...(setup.isLocal(req) ? { hostToken: HOST_TOKEN } : {}), mock: env("MOCK") === "1", mode: duet.getMode?.() || "battle", difficulty: duet.getDifficulty?.() || "spicy", needsSetup: setup.needsSetup(), roomCode: audience.code, joinUrl: publicUrl ? `${publicUrl}/join.html` : `http://${lanIp()}:${PORT}/join.html`, playUrl: playUrl(), players: players.count() });
   },
 };
 
@@ -285,15 +308,40 @@ function lanIp() {
   return all.find((ip) => /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) || all[0] || "localhost";
 }
 const phoneUrl = () => `http://${lanIp()}:${PORT}/phone.html`;
-const playUrl = () => (publicUrl ? `${publicUrl}/play` : `http://${lanIp()}:${PORT}/play`);
+// Always hand out a SECURE link so the phone mic works: the public tunnel if it's up, else the LAN https port.
+const playUrl = () => (publicUrl ? `${publicUrl}/play` : httpsReady ? `https://${lanIp()}:${HTTPS_PORT}/play` : `http://${lanIp()}:${PORT}/play`);
 // Any-Wi-Fi public link (TUNNEL=1 or --tunnel): https://*.trycloudflare.com, real certificate, works on 4G too.
 let publicUrl = "", tunnelState = "off"; // off | starting | on | failed
+// Easy-to-type link for the tunnel: is.gd/duet<roomcode> (free, no account). SHORT_LINK=0 turns it off.
+let shortUrl = "";
+async function makeShortUrl(longUrl) {
+  if (env("SHORT_LINK") === "0") return "";
+  const base = `duet-${String(audience.code || "").toLowerCase()}`;
+  // TinyURL (custom alias, no account), then is.gd as a backup. Aliases are global, so add a number if taken.
+  for (const alias of [base, ...Array.from({ length: 5 }, () => base + Math.floor(Math.random() * 90 + 10))]) {
+    try {
+      const r = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}&alias=${alias}`, { signal: AbortSignal.timeout(8000) });
+      const t = (await r.text()).trim();
+      if (r.ok && /^https:\/\/tinyurl\.com\//.test(t)) return t.replace(/^https?:\/\//, "");
+    } catch { break; }
+  }
+  try {
+    const r = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}&shorturl=${base.replace("-", "")}`, { signal: AbortSignal.timeout(8000) });
+    const j = await r.json();
+    if (j.shorturl) return j.shorturl.replace(/^https?:\/\//, "");
+  } catch { /* no short link: the QR still works */ }
+  return "";
+}
 
 /** /api/broadcast + /api/phone: phones relay events. Host-only: reset. mic-unavailable only from the snapping phone. */
 async function relay(req, res) {
   const b = await readJson(req);
   const host = hostOk(req);
   if (!host && b?.type === "reset") return sendJson(res, 403, { error: "only the stage can reset" });
+  if (!host && b?.type === "mic-unavailable" && active?.pvp) { // PvP: only the two battling phones can switch the stage to the laptop mic
+    const pair = pvp.get(active.id)?.pvp?.players || [];
+    if (!pair.some((p) => p.id === b.player)) return sendJson(res, 200, { ok: true, ignored: true });
+  }
   if (!host && b?.type === "mic-unavailable" && active && !active.pvp) {
     const owner = owners.get(active.id);
     if (owner && b.client !== owner) return sendJson(res, 200, { ok: true, ignored: true });
@@ -337,7 +385,9 @@ async function handle(req, res) {
   }
   // "/" = landing (HOST or PLAYER), "/stage" = the stage, "/play" = player phone. No keys yet: setup, on the laptop only.
   const local = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(req.headers.host || "");
-  const pages = { "/": "home.html", "": "home.html", "/stage": "index.html", "/play": "play.html" };
+  // The laptop is always the host: "/" and "/stage" open the stage there. Any other device (QR / tunnel link) lands on the player page.
+  const pages = local ? { "/": "index.html", "": "index.html", "/stage": "index.html", "/play": "play.html", "/home": "home.html" }
+                      : { "/": "play.html", "": "play.html", "/stage": "play.html", "/play": "play.html" };
   const page = pages[urlPath] && (urlPath !== "/play" && setup.needsSetup() && local ? "setup.html" : pages[urlPath]);
   const file = path.join(publicDir, page || urlPath);
   if (!file.startsWith(publicDir) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return res.writeHead(404).end("Not found");
@@ -369,7 +419,10 @@ http.createServer(safeHandle).listen(PORT, "0.0.0.0", () => {
     tunnelState = "starting";
     console.log("Tunnel: starting a free Cloudflare quick tunnel (any Wi-Fi / 4G)...");
     startTunnel({ port: PORT, appDir: here }).then((url) => {
-      if (url) { publicUrl = url; tunnelState = "on"; console.log(`Public: ${url}  (phones on ANY network: ${url}/play)`); broadcast({ type: "public-url", publicUrl: url, at: Date.now() }); }
+      if (url) {
+        publicUrl = url; tunnelState = "on"; console.log(`Public: ${url}  (phones on ANY network: ${url}/play)`); broadcast({ type: "public-url", publicUrl: url, at: Date.now() });
+        makeShortUrl(`${url}/play?code=${audience.code}`).then((s) => { if (!s) return; shortUrl = s; console.log(`Short: ${s}`); broadcast({ type: "public-url", publicUrl: url, shortUrl: s, at: Date.now() }); });
+      }
       else tunnelState = "failed";
     }).catch((e) => { tunnelState = "failed"; console.log("[tunnel]", e.message); });
   }

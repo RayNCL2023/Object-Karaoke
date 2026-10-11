@@ -591,8 +591,10 @@ async function loadIdle() {
     const play = String(s.playUrl || (s.publicUrl ? `${s.publicUrl}/play` : `${location.origin}/play`));
     const url = code ? `${play}?code=${encodeURIComponent(code)}` : play;
     el.joinCode.textContent = code || "----";
-    el.phoneUrl.textContent = play.replace(/^https?:\/\//, "");
-    el.phoneHint.textContent = "";
+    // Easy-to-type short link (is.gd/duet<code>) when the tunnel is up; QR still carries the full link.
+    el.phoneUrl.textContent = s.shortUrl ? String(s.shortUrl) : play.replace(/^https?:\/\//, "");
+    el.phoneUrl.classList.toggle("short", !!s.shortUrl);
+    el.phoneHint.textContent = s.shortUrl ? "or type it in any browser" : "";
     let mic = s.micUrl ? String(s.micUrl) : "";
     if (!mic) { mic = s.phoneUrl || `${location.origin}/mic.html`; try { const u = new URL(mic); u.pathname = "/mic.html"; mic = u.toString(); } catch {} }
     el.joinMic.innerHTML = `Single phone, mic only: <b>${esc(mic.replace(/^https?:\/\//, ""))}</b>${/^https:\/\/\d/.test(mic) ? " (tap Advanced → Proceed)" : ""}`;
@@ -876,13 +878,14 @@ async function freestyleTurn(r, rounds, ms, myRun) {
   setFac(`ROAST BATTLE · ROUND ${pad2(r)}/${pad2(rounds)}`);
   charMode.listening = true;
   try {
+    // record-start goes out BEFORE the 3-2-1 (leadMs): the server stamps startAt, the phone mirrors the countdown and opens its mic on time
+    broadcast({ type: "record-start", line: r, round: r, ms, leadMs: 1650, ...(session?.demo ? { player: "demo" } : {}) });
     for (const n of ["3", "2", "1"]) { bigCount(n); await sleep(550); guard(myRun); }
     bigCount("FREESTYLE!");
     el.got.classList.remove("show");
     el.rec.classList.add("live");
     takeWaiters.set(r, () => {}); // lets the laptop-mic fallback find the live round
     el.recTitle.textContent = "YOUR TURN";
-    broadcast({ type: "record-start", line: r, round: r, ms, ...(session?.demo ? { player: "demo" } : {}) });
     if (!phoneMicOk) laptopTake(r, ms).catch((e) => console.warn("[stage] laptop take", e));
     let end = performance.now() + ms;
     turnExtend = 0;
@@ -901,21 +904,36 @@ async function freestyleTurn(r, rounds, ms, myRun) {
 
 // ---------- Karaoke (secondary mode): user sings every line, object is the hype man ----------
 async function karaokeLines(s, myRun) {
+  // REAL SONGS: an embedded official YouTube karaoke video (public/karaoke.js runs it; phones record in chunks).
+  if (s.youtube && window.KaraokeYT) {
+    Beat.stop();
+    return window.KaraokeYT.run(s, { guard: () => guard(myRun), broadcast, sleep, bigCount, toast, playMp3, speak: speakFallback, sing: (on) => { charMode.singing = on; }, listen: (on) => { charMode.listening = on; }, el });
+  }
   const lines = s.song.lines;
+  const parted = !!s.parts; // karaoke parts: P1..P4 / ALL / AI (lib/karaoke.mjs)
   for (const n of ["3", "2", "1"]) { bigCount(n); await sleep(Math.min(700, Math.max(380, 60000 / (s.song.bpm || 100)))); guard(myRun); }
   bigCount("SING!");
   el.recTitle.textContent = "SING IT";
   el.rec.classList.add("live");
   for (let i = 0; i < lines.length; i++) {
     guard(myRun);
-    const ms = lines[i].ms || 4000;
+    const L = lines[i];
+    const ms = L.ms || 4000;
     focusLine(i);
-    wipe(i, ms);
-    el.recState.textContent = phoneMicOk ? "Sing it! Listening on your phone…" : "Sing it! Listening on the laptop mic…";
     broadcast({ type: "line", index: i });
-    broadcast({ type: "record-start", line: i, ms });
+    if (parted && L.who === "object") { // the AI sings this one (eleven_v3 [sings], beat-locked) and the character animates
+      el.recState.textContent = `${L.singerName || s.character?.name || "The AI"} is singing…`;
+      await objectLine(i, L, myRun, s.character || {});
+      guard(myRun); await sleep(120); continue;
+    }
+    wipe(i, ms);
+    // Target the phones: one player's part -> only their phone; ALL -> every phone; old flow -> untargeted.
+    const target = !parted ? {} : L.part === "ALL" ? { all: true } : L.singer && L.singer !== "ai" ? { player: L.singer, playerName: L.singerName, playerColour: L.singerColour } : {};
+    el.recState.textContent = parted ? `${L.part === "ALL" ? "EVERYONE" : String(L.singerName || "You").toUpperCase()}: sing it!` : phoneMicOk ? "Sing it! Listening on your phone…" : "Sing it! Listening on the laptop mic…";
+    broadcast({ type: "record-start", line: i, ms, id: s.id, ...target });
     takeWaiters.set(i, () => {});
     if (!phoneMicOk) laptopTake(i, ms - 150).catch((e) => console.warn("[stage] laptop take", e));
+    if (parted && L.aiAlong && L.audio && !(s.mock || L.ttsFailed)) { charMode.singing = true; playMp3(L.audio, ms).catch(() => {}).finally(() => { charMode.singing = false; }); } // 1 player: the AI sings the chorus with you
     await sleep(ms + 350);
     takeWaiters.delete(i);
   }
@@ -964,7 +982,7 @@ async function judge(myRun) {
   let crowdTally = null;
   const voting = (session.battle || session.mode === "battle") && (crowd.audienceCount() > 0 || session.pvp); // let the crowd's last votes land
   // Real sessions: the server waits waitVotesMs, then closes voting and judges, while the stage shows VOTE CLOSING 3..2..1.
-  const judgeP = session.demo ? Promise.reject(new Error("offline demo")) : postJson("/api/judge", { id: session.id, ...(voting ? { waitVotesMs: 5000 } : {}) });
+  const judgeP = session.demo ? Promise.reject(new Error("offline demo")) : postJson("/api/judge", { id: session.id, ...(voting ? { waitVotesMs: 5000 } : {}), ...(session.youtube && window.KaraokeYT ? { asked: window.KaraokeYT.asked() } : {}) });
   judgeP.catch(() => {});
   if (voting) await voteClosing(myRun);
   if (session.demo && voting) { try { crowdTally = (await postJson("/api/audience/close", { id: session.id })).tally || null; } catch {} }

@@ -24,14 +24,14 @@ css.textContent = `
 .lob-empty { font-weight: 700; font-size: 14px; text-transform: uppercase; color: #8a8478; margin: 0; align-self: center; }
 .lob-aud { margin: 0; font-weight: 700; font-size: 14px; text-transform: uppercase; }
 .lob-aud b { background: #ffd400; padding: 0 5px; }
-.lob-modes { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
-.lob-modes button { font-family: "Anton", sans-serif; font-size: 22px; line-height: 1; text-transform: uppercase; padding: 12px 8px; border: 4px solid #111; background: #fff; color: #111; cursor: pointer; border-radius: 0; }
+.lob-modes { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.lob-modes button { font-family: "Anton", sans-serif; font-size: 19px; line-height: 1; text-transform: uppercase; padding: 12px 8px; border: 4px solid #111; background: #fff; color: #111; cursor: pointer; border-radius: 0; }
 .lob-modes button.on { background: #ff4f9a; box-shadow: 5px 5px 0 #111; transform: translate(-2px,-2px); }
 .lob-hint { margin: 0; font-weight: 700; font-size: 15px; text-transform: uppercase; border-left: 6px solid #ff4f9a; padding-left: 8px; }
 .lob-micok { display: inline-block; margin-left: 8px; font: 700 12px "Space Mono", monospace; padding: 1px 5px; border: 2px solid #111; vertical-align: 3px; }
 .lob-micok.y { background: #9fe8b0; color: #111; } .lob-micok.n { background: #ff4f9a; color: #111; }
 .lob-mic { margin: 0; font-size: 12px; color: #8a8478; font-weight: 700; word-break: break-all; }
-.pvb { position: fixed; left: 50%; top: 14px; z-index: 31; display: none; gap: 10px; align-items: stretch; font-family: "Space Mono", monospace; color: #111; pointer-events: none; width: min(760px, 56vw); }
+.pvb { position: fixed; left: 50%; top: 14px; z-index: 90; display: none; gap: 10px; align-items: stretch; font-family: "Space Mono", monospace; color: #111; pointer-events: none; width: min(760px, 56vw); }
 .pvb.on { display: flex; }
 .pvb-p { flex: 1 1 0; min-width: 0; background: #ece6d6; border: 4px solid #111; box-shadow: 6px 6px 0 #111; padding: 6px 10px 8px; transition: transform .25s cubic-bezier(.2,.8,.2,1), opacity .25s; opacity: .72; }
 .pvb-p.live { opacity: 1; transform: translateY(4px) scale(1.04); box-shadow: 8px 8px 0 #ff4f9a; }
@@ -39,7 +39,7 @@ css.textContent = `
 .pvb-p b i { display: inline-block; width: 16px; height: 16px; border: 3px solid #111; margin-right: 8px; vertical-align: 2px; }
 .pvb-p small { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; background: #111; color: #ece6d6; padding: 0 6px; }
 .pvb-p.live small { background: #ff4f9a; color: #111; }
-.pvb-p p { margin: 5px 0 0; font-size: 13px; font-weight: 700; line-height: 1.25; max-height: 2.5em; overflow: hidden; }
+.pvb-p p { margin: 5px 0 0; font-size: 15px; font-weight: 700; line-height: 1.25; max-height: 3.75em; overflow: hidden; }
 .pvb-vs { align-self: center; font-family: "Rubik Mono One", monospace; font-size: 20px; background: #ffd400; border: 4px solid #111; padding: 4px 8px; transform: rotate(-6deg); }
 .pvv { position: fixed; left: 50%; top: 12vh; z-index: 32; transform: translateX(-50%) translateY(30px); opacity: 0; width: min(1000px, 92vw); display: none; flex-direction: column; gap: 14px; background: #ece6d6; border: 5px solid #111; box-shadow: 12px 12px 0 #111; padding: 18px 18px 14px; font-family: "Space Mono", monospace; color: #111; transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .45s; }
 .pvv.on { display: flex; }
@@ -69,7 +69,7 @@ lob.className = "lob";
 lob.innerHTML = `<div class="lob-head"><b>Players</b><span id="lobN">0/8</span></div>
   <div class="lob-chips" id="lobChips"></div>
   <p class="lob-aud" id="lobAud"></p>
-  <div class="lob-modes" id="lobModes"><button type="button" data-m="object">VS the object</button><button type="button" data-m="pvp">Player vs player</button></div>
+  <div class="lob-modes" id="lobModes"><button type="button" data-m="object">VS the object</button><button type="button" data-m="pvp">Player vs player</button><button type="button" data-m="ovo">Object vs object</button></div>
   <p class="lob-hint" id="lobHint"></p>
   <p class="lob-mic" id="lobMic"></p>`;
 const pc = document.querySelector("#idle .phone-card");
@@ -78,19 +78,23 @@ if (pc) pc.after(lob); else ($("idle") || document.body).appendChild(lob);
 let players = [], match = { type: "object", current: null }, audience = 0, max = 8;
 function renderLobby() {
   $("lobN").textContent = `${players.length}/${max}`;
-  const sel = match.type === "pvp" ? match.players || [] : [match.current];
+  const duo = match.type === "pvp" || match.type === "ovo"; // OBJECT vs OBJECT: up to 2 trainers, picked like PvP
+  const sel = duo ? match.players || [] : [match.current];
   $("lobChips").innerHTML = players.length
     ? players.map((p) => {
       const k = sel.indexOf(p.id);
-      const tag = k < 0 ? "" : match.type === "pvp" ? `P${k + 1}` : "UP NEXT";
+      const tag = k < 0 ? "" : match.type === "pvp" ? `P${k + 1}` : match.type === "ovo" ? `OBJ ${k + 1}` : "UP NEXT";
       return `<button type="button" class="lob-chip${k >= 0 ? " on" : ""}" data-id="${esc(p.id)}"><i style="background:${esc(p.colour)}"></i>${esc(p.name)}${micOk.has(p.id) ? `<b class="lob-micok ${micOk.get(p.id) ? "y" : "n"}">${micOk.get(p.id) ? "&#10003; MIC" : "&#10007; MIC"}</b>` : ""}${tag ? `<em>${tag}</em>` : ""}</button>`;
     }).join("")
-    : `<p class="lob-empty">Nobody yet. Scan the QR &rarr; PLAYER &rarr; BATTLE</p>`;
+    : `<p class="lob-empty">Nobody yet &mdash; scan the QR</p>`;
   $("lobAud").innerHTML = `<b>${audience}</b> ${audience === 1 ? "judge" : "judges"} in the crowd`;
   for (const b of $("lobModes").children) b.classList.toggle("on", b.dataset.m === match.type);
   const byId = (id) => players.find((p) => p.id === id);
   let hint;
-  if (match.type === "pvp") {
+  if (match.type === "ovo") {
+    const [a, b] = (match.players || []).map(byId);
+    hint = a && b ? `${a.name} snaps object 1, ${b.name} snaps object 2. They battle each other!` : a ? `${a.name} snaps BOTH objects (tap a 2nd player to split)` : "Any phone: snap object 1, then object 2. They battle each other!";
+  } else if (match.type === "pvp") {
     const [a, b] = (match.players || []).map(byId);
     hint = players.length < 2 ? "Need 2 players for PvP. Get a mate on!" : a && b ? `${a.name} vs ${b.name}. Snap an object: it's the MC.` : "Tap two players to battle";
   } else {
@@ -104,17 +108,17 @@ $("lobChips").addEventListener("click", (e) => {
   if (!b) return;
   e.stopPropagation();
   const id = b.dataset.id;
-  if (match.type === "pvp") {
+  if (match.type === "pvp" || match.type === "ovo") {
     let sel = (match.players || []).filter((x) => x !== id);
     if (sel.length === (match.players || []).length) sel = [...sel, id].slice(-2); // not selected yet: add (max 2)
-    setMatch({ type: "pvp", players: sel });
+    setMatch({ type: match.type, players: sel });
   } else setMatch({ type: "object", current: id });
 });
 $("lobModes").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-m]");
   if (!b) return;
   e.stopPropagation();
-  if (b.dataset.m === "pvp") setMatch({ type: "pvp", players: match.type === "pvp" ? match.players : players.slice(0, 2).map((p) => p.id) });
+  if (b.dataset.m === "pvp" || b.dataset.m === "ovo") setMatch({ type: b.dataset.m, players: match.type === "pvp" || match.type === "ovo" ? match.players : players.slice(0, 2).map((p) => p.id) });
   else setMatch({ type: "object" });
 });
 async function setMatch(m) {
@@ -148,9 +152,13 @@ function placeBanner() {
   if (!h || !c || !h.width) { Object.assign(pvb.style, { left: "50%", top: "14px", transform: "translateX(-50%)" }); return; }
   const hud = document.querySelector(".aud-hud.on")?.getBoundingClientRect();
   const right = hud && hud.bottom > h.bottom ? hud.left - 16 : c.right - 24;
-  Object.assign(pvb.style, { left: `${Math.round(h.left)}px`, top: `${Math.round(h.bottom + 12)}px`, transform: "none", width: `${Math.max(320, Math.round(Math.min(760, right - h.left)))}px` });
+  const w = Math.max(320, Math.round(Math.min(760, right - h.left)));
+  const left = Math.max(8, Math.min(innerWidth - w - 8, Math.round(h.left))); // never off-screen (1920x1080 layout / small windows)
+  const top = Math.max(8, Math.min(innerHeight - (pvb.offsetHeight || 120) - 8, Math.round(h.bottom + 12)));
+  Object.assign(pvb.style, { left: `${left}px`, top: `${top}px`, transform: "none", width: `${w}px` });
 }
 addEventListener("resize", placeBanner);
+setInterval(() => { if (pvb.classList.contains("on")) placeBanner(); }, 1000); // follow layout changes during the show
 // "You said" cards on the stage: label them with the player's name (stage.js builds them; we only relabel).
 const track = $("track");
 if (track) new MutationObserver((muts) => {

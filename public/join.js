@@ -142,6 +142,19 @@ function listen() {
         phase(`${session.name} is up!`, session.battle ? `the ${s.object || "object"} wants a roast battle` : "karaoke time - hype them up");
         break;
       }
+      // OBJECT vs OBJECT (lib/ovo.mjs): votes are for the two objects (values ovo_a / ovo_b), shaped like PvP
+      case "ovo-photo": if (!session?.ovo) phase("Two objects are waking up", "Object vs object - get ready to judge"); break;
+      case "ovo-ready": {
+        const s = ev.session || {};
+        session = { id: s.id, name: s.title || "Object vs Object", battle: true, ovo: true, pvp: (s.sides || []).map((x) => ({ id: x.value, name: x.character?.name || "Object" })) };
+        $("vote").classList.remove("show");
+        phase(`${session.pvp[0].name} vs ${session.pvp[1].name}`, `${s.title || "Object vs object"} - you judge!`);
+        break;
+      }
+      case "ovo-vote": if (session?.ovo && ev.id === session.id) { phase(`Round ${ev.round}: who won?`, "Vote now!"); openVote(Number(ev.round) || 1); } break;
+      case "ovo-verdict":
+        if (session?.ovo) { phase(`${ev.winnerName} wins!`, (ev.sides || []).map((x) => `${x.name} ${x.score}`).join(" · ")); setTimeout(() => $("vote").classList.remove("show"), 4000); }
+        break;
       case "record-start":
         $("vote").classList.remove("show");
         phase(ev.playerName ? `${ev.playerName} on the mic!` : ev.round ? `Round ${ev.round}: freestyle!` : "Their turn to sing!", "Make some noise");

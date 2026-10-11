@@ -65,7 +65,7 @@
     <div class="idle-left">
       <p class="eyebrow">Hack Day Manchester &middot; live roast battle</p>
       <h1 class="title"><span class="t1">Duet</span><span class="t2">Anything</span></h1>
-      <p class="tagline">Snap any object. It wakes up as a cheeky Manc rapper and roast-battles you, bar for bar. The crowd votes on their phones. (Karaoke duet is the side mode: <kbd>M</kbd>.)</p>
+      <p class="tagline">Snap any object. It wakes up with its own voice and roast-battles you, bar for bar. The crowd votes on their phones.</p>
       <div class="cta" id="idleCta"><span class="dot"></span><span id="idleCtaText">Snap anything to start</span></div>
       <ol class="mini-board" id="idleBoard"></ol>
     </div>
@@ -184,6 +184,7 @@
       <p class="help-t">Keys</p>
       <ul>
         <li><kbd>B</kbd> roast battle demo (offline)</li>
+        <li><kbd>O</kbd> object vs object demo (offline)</li>
         <li><kbd>M</kbd> mode: roast battle / karaoke</li>
         <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> difficulty: mild / spicy / savage</li>
         <li><kbd>Space</kbd> again</li>
@@ -211,9 +212,11 @@
   })();
   </script>
 
+  <script src="karaoke.js"></script>
   <script type="module" src="stage.js"></script>
   <script type="module" src="audience-stage.js"></script>
   <script type="module" src="pvp-stage.js"></script>
+  <script type="module" src="ovo-stage.js"></script>
   <script type="module" src="waking.js"></script>
 </body>
 </html>

@@ -530,3 +530,78 @@ body.show-mic .join-mic { display: block; }
 .join-row { flex-wrap: wrap; }
 .join-card .phone-url { flex: 1 1 250px; min-width: 0; word-break: normal; overflow-wrap: anywhere; font-size: 21px; }
 body[data-screen="result"] .logo-sm { opacity: 0; }
+
+/* ---- Idle clean-up (Kaif, live test): nothing may sit on the character strip ---- */
+/* The start button replaces the "Snap anything" call-to-action in the left column until the show starts. */
+.gate { inset: auto; left: 112px; top: 418px; padding: 0; display: block; }
+body:has(.gate:not(.hide)) #idleCta { visibility: hidden; }
+.gate-btn { font-size: 40px; padding: 14px 30px 14px 16px; transform: rotate(-1deg); box-shadow: 10px 10px 0 var(--accent); }
+.gate-hint { display: none; }          /* keys live behind H now */
+#lobMic, .lob-mic { display: none; }   /* single-phone mic link: press Q instead */
+.mini-board li:nth-child(n+3) { display: none; } /* idle teaser: top 2 only */
+
+/* Easy join link shown big under the QR */
+#phoneUrl.short { font-size: 44px; font-weight: 700; background: var(--yellow); padding: 2px 10px; }
+
+/* ---------- Breathing-room pass (1920x1080 grid): 96px margins, left column 1050px, right column (QR) 580px,
+   spacing scale 24 / 40 / 64. Every idle group is placed on the fixed canvas so nothing can overlap.
+   Left = title + one action, then ONE "host controls" bar, then a light players line. Right = the QR. Bottom = characters. ---------- */
+#idle { display: block; padding: 0; }
+.idle-left { position: static; display: block; }
+.idle-left > *, #idle > .lob > .lob-modes, #idle > .lob > .lob-hint { margin: 0; }
+.idle .eyebrow { position: absolute; left: 96px; top: 88px; margin: 0; transform: none; font-size: 18px; padding: 6px 14px; }
+.idle .title { position: absolute; left: 96px; top: 148px; margin: 0; font-size: 100px; gap: 10px; }
+.idle .tagline { position: absolute; left: 96px; top: 392px; width: 1000px; max-width: none; margin: 0; font-size: 22px; line-height: 1.45; }
+.idle .cta, #idleCta { position: absolute; left: 96px; top: 490px; margin: 0; transform: none; box-shadow: 8px 8px 0 #111; padding: 14px 26px; font-size: 38px; }
+/* Start button takes the CTA's exact slot until the show starts */
+.gate { left: 96px; top: 490px; }
+.gate-btn { transform: none; font-size: 38px; padding: 12px 28px 12px 14px; box-shadow: 8px 8px 0 var(--accent); }
+.gate-btn:hover { transform: translate3d(-3px, -3px, 0); }
+
+/* HOST CONTROLS bar (616-752): row 1 = match type + its hint, row 2 = mode + difficulty */
+.idle-left::after { content: ""; position: absolute; left: 96px; top: 616px; width: 1050px; height: 136px; background: #fff; border: 4px solid #111; box-shadow: 6px 6px 0 #111; z-index: 0; pointer-events: none; }
+.idle-left::before { content: "Host controls"; position: absolute; left: 112px; top: 603px; z-index: 2; font: 700 14px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; background: #111; color: var(--yellow); padding: 6px 10px; }
+.idle .mode-btn { position: absolute; left: 116px; top: 692px; z-index: 1; width: 400px; height: 46px; margin: 0; padding: 0 14px; transform: none; box-shadow: none; border-width: 3px; font-size: 16px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idle .mode-btn:hover { transform: none; box-shadow: 3px 3px 0 #111; }
+.idle-left .diff-seg { position: absolute; left: 536px; top: 692px; z-index: 1; height: 46px; margin: 0; transform: none; box-shadow: none; border-width: 3px; }
+.idle-left .diff-seg button { display: flex; align-items: center; padding: 0 16px; border-right-width: 3px; font-size: 16px; }
+.idle-left .diff-seg button small { display: none; }
+#idle > .lob > .lob-modes { position: absolute; left: 20px; top: -160px; z-index: 1; width: 560px; height: 46px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+#idle > .lob > .lob-modes button { padding: 0 8px; font-size: 19px; border-width: 3px; box-shadow: none; transform: none; }
+#idle > .lob > .lob-modes button.on { box-shadow: 3px 3px 0 #111; transform: none; }
+#idle > .lob > .lob-hint { position: absolute; left: 600px; top: -160px; z-index: 1; width: 430px; height: 46px; display: flex; align-items: center; font-size: 15px; line-height: 1.25; border-left-width: 5px; }
+
+/* PLAYERS: one light line (792+), grows downward only when chips wrap */
+#idle > .lob { position: absolute; left: 96px; top: 792px; bottom: auto; height: auto; width: 1050px; max-width: none; display: flex; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 12px 20px; padding: 12px 18px; background: rgba(255, 255, 255, 0.45); border: 3px solid #111; box-shadow: none; transform: none; }
+#idle > .lob::before { display: none; }
+#idle > .lob .lob-head { flex: 0 0 auto; gap: 10px; align-items: center; }
+#idle > .lob .lob-head b { font-size: 30px; }
+#idle > .lob .lob-chips { flex: 1 1 400px; min-height: 0; gap: 10px; }
+#idle > .lob .lob-chip { font-size: 20px; padding: 4px 12px; border-width: 3px; box-shadow: 3px 3px 0 #111; }
+#idle > .lob .lob-chip.on { transform: translate(-2px, -2px); }
+#idle > .lob .lob-empty { font-size: 16px; color: var(--grey-dark); }
+#idle > .lob .lob-aud { flex: 0 0 auto; margin-left: auto; font-size: 14px; }
+
+/* RIGHT: the join card is the one focal point (88-~860) */
+.idle .join-card { position: absolute; right: 96px; top: 88px; width: 580px; gap: 12px; padding: 46px 24px 20px; transform: rotate(1deg); }
+.idle .join-head { font-size: 46px; }
+.idle .join-row { align-items: flex-end; }
+.idle .join-code { font-size: 84px; }
+
+/* CHARACTERS: one row of smaller stickers across the bottom, clear space above */
+.idle .roster { position: absolute; left: 96px; right: 96px; top: 900px; }
+.idle .roster-title { margin-bottom: 8px; font-size: 16px; }
+.idle .roster-row { --h: 76px; gap: 18px; padding: 4px 4px 10px; flex-wrap: nowrap; }
+.idle .roster-row .cm-name { font-size: 13px; }
+/* Leaderboard teaser: two small chips on the characters label line, right-aligned */
+.idle .mini-board, .idle-left .mini-board { position: absolute; right: 96px; top: 900px; display: flex; flex-direction: row; gap: 12px; margin: 0; }
+.idle-left .mini-board li, .idle .mini-board li { font-size: 16px; padding: 3px 10px; border-width: 3px; box-shadow: 3px 3px 0 #111; transform: none; }
+
+/* VERDICT: crowd only along the verdict column, everything ends above it; score no longer hits the winner bar */
+body[data-screen="result"] .crowd { left: calc(34cqw + 6px); --h: 104px; }
+.verdict { bottom: 200px; row-gap: 22px; }
+.verdict .score { margin-top: 16px; }
+.verdict .bw { row-gap: 14px; }
+.idle .join-card { width: 560px; }
+.idle .join-card .phone-url { font-size: 18px; overflow-wrap: normal; word-break: normal; white-space: nowrap; flex: 0 1 auto; }
+.idle .join-card #phoneUrl.short { font-size: 40px; }

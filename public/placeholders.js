@@ -21,7 +21,7 @@ export const PLACEHOLDERS = [
       <rect x="32" y="158" width="136" height="24" rx="6" fill="#e2620c"/>`,
   },
   {
-    id: "ph_pint", name: "Pint Gallaghop", object: "pint glass", colour: "#e0a12b", personality: "full of himself, half full of ale", catchphrase: "Get it down yer",
+    id: "ph_pint", name: "Pinty McPintface", object: "pint glass", colour: "#e0a12b", personality: "full of himself, half full of ale", catchphrase: "Get it down yer",
     bbox: { x: 0.25, y: 0.09, w: 0.5, h: 0.8 },
     face: { leftEye: { x: 0.42, y: 0.47 }, rightEye: { x: 0.58, y: 0.47 }, eyeSize: 0.11, mouth: { x: 0.5, y: 0.66, width: 0.16 } },
     art: `<path d="M56 30 H144 L134 176 H66 Z" fill="#e0a12b" stroke="#c8861a" stroke-width="5" stroke-linejoin="round"/>
