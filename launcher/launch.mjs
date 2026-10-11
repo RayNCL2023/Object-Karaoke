@@ -1,4 +1,4 @@
-// Duet Anything Windows launcher: starts server.mjs in this process, then opens the stage in
+// dissPICable Windows launcher: starts server.mjs in this process, then opens the stage in
 // Microsoft Edge app mode (its own clean window, no browser bars). Falls back to Chrome, then the default browser.
 // From source: `npm run app`. Packaged: DuetAnything.exe (built by launcher/build-exe.mjs) runs this same file.
 import fs from "node:fs";
@@ -97,7 +97,7 @@ async function main() {
   await import("../server.mjs");
   if (!(await waitForServer(port))) log("server did not answer in time, opening anyway");
   openStage(`http://localhost:${port}/stage`, dataDir);
-  console.log("\nDuet Anything is running. Phones join with the link on the stage.");
+  console.log("\ndissPICable is running. Phones join with the link on the stage.");
   console.log(`Reopen the stage: http://localhost:${port}/stage`);
   console.log("Close this window to stop.\n");
 }

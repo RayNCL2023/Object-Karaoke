@@ -1,4 +1,4 @@
-// Duet Anything - phone mic. Snap an object, then sing your lines into the phone when the stage says so.
+// dissPICable - phone mic. Snap an object, then sing your lines into the phone when the stage says so.
 import { openMicTest, micPassed, paintChips, micTestOpen, closeMicTest, getMicStream } from "./mictest.js";
 import { listen as listenEvents } from "./events.js";
 const $ = (id) => document.getElementById(id);

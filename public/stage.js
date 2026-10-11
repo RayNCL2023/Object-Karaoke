@@ -1,4 +1,4 @@
-// Duet Anything - stage (laptop / projector). Owns index.html + stage.css.
+// dissPICable - stage (laptop / projector). Owns index.html + stage.css.
 import { onPhone, status } from "./api.js";
 import { refreshRoster, renderGallery, pickCrowd, createCrowd } from "./crowd.js";
 import { createCaptions } from "./captions.js";

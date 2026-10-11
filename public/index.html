@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Duet Anything</title>
+  <title>dissPICable</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik+Mono+One&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -64,7 +64,7 @@
   <section class="screen idle" id="idle">
     <div class="idle-left">
       <p class="eyebrow">Hack Day Manchester &middot; live roast battle</p>
-      <h1 class="title"><span class="t1">Duet</span><span class="t2">Anything</span></h1>
+      <h1 class="title"><span class="t1">diss</span><span class="t2">PICable</span></h1>
       <p class="tagline">Snap any object. It wakes up with its own voice and roast-battles you, bar for bar. The crowd votes on their phones.</p>
       <div class="cta" id="idleCta"><span class="dot"></span><span id="idleCtaText">Snap anything to start</span></div>
       <ol class="mini-board" id="idleBoard"></ol>
@@ -115,11 +115,11 @@
         <p class="char-object" id="charObject"></p>
         <p class="char-catch" id="charCatch"></p>
       </div>
-      <p class="fac" id="facLabel">FAC 51 &middot; DUET ANYTHING</p>
+      <p class="fac" id="facLabel">FAC 51 &middot; dissPICable</p>
     </div>
 
     <div class="right-col">
-      <div class="logo-sm" aria-hidden="true">DUET<br>ANYTHING</div>
+      <div class="logo-sm" aria-hidden="true">diss<br>PICable</div>
       <div class="song-head">
         <span class="badge" id="songGenre"></span>
         <h2 class="song-title" id="songTitle"></h2>
@@ -191,6 +191,7 @@
         <li><kbd>Esc</kbd> reset everything (phones too)</li>
         <li><kbd>N</kbd> next player</li>
         <li><kbd>Q</kbd> show the single-phone mic link</li>
+        <li><kbd>V</kbd> play the trailer</li>
         <li><kbd>H</kbd> close this</li>
       </ul>
     </div>
@@ -213,6 +214,25 @@
   </script>
 
   <script>fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) { document.body.classList.toggle("solo", s.solo !== false); }).catch(function () { document.body.classList.add("solo"); });</script>
+  <script>
+  // Built-in trailer (public/promo): V or the Trailer button opens it full screen, Esc / V / Close shuts it.
+  (function () {
+    var ov = document.createElement("div"); ov.id = "promoOv";
+    ov.innerHTML = '<button type="button">Close (Esc)</button>';
+    document.body.appendChild(ov);
+    function open() { if (ov.classList.contains("on")) return close(); var f = document.createElement("iframe"); f.src = "promo/index.html"; f.allow = "autoplay; fullscreen"; ov.appendChild(f); ov.classList.add("on"); setTimeout(function () { try { f.focus(); } catch (e) {} }, 300); }
+    function close() { ov.classList.remove("on"); var f = ov.querySelector("iframe"); if (f) f.remove(); }
+    ov.querySelector("button").addEventListener("click", function (e) { e.stopPropagation(); close(); });
+    var b = document.createElement("button"); b.type = "button"; b.className = "trailer-btn"; b.innerHTML = "&#9654; Trailer"; b.addEventListener("click", function (e) { e.stopPropagation(); open(); });
+    (document.querySelector(".idle-left") || document.body).appendChild(b);
+    addEventListener("keydown", function (e) {
+      if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+      if ((e.key === "v" || e.key === "V") && document.body.dataset.screen === "idle") { e.preventDefault(); e.stopImmediatePropagation(); open(); }
+      else if (e.key === "Escape" && ov.classList.contains("on")) { e.preventDefault(); e.stopImmediatePropagation(); close(); }
+    }, true);
+    addEventListener("message", function (e) { if (e.data === "promo-close") close(); });
+  })();
+  </script>
   <script src="karaoke.js"></script>
   <script type="module" src="stage.js"></script>
   <script type="module" src="audience-stage.js"></script>

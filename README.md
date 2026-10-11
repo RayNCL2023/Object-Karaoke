@@ -1,4 +1,4 @@
-# Duet Anything
+# dissPICable
 
 **Snap any object. It sings a duet with you. Then it roasts you.**
 
@@ -74,7 +74,7 @@ From source: `npm run app` does the same with your project folder as the data fo
 
 ## Tracks we entered, and honestly how we fit
 
-| Track | How Duet Anything fits |
+| Track | How dissPICable fits |
 |---|---|
 | **Best Use of Gemma 4** | Gemma 4 (via the Gemini API) does the real thinking: it sees the photo, invents the character, writes the whole song as structured JSON, and judges and roasts your performance. |
 | **Best Open-Source AI Project** | Gemma 4 is an open-weight model, the repo is public and MIT licensed, and the app runs with zero npm packages so anyone can clone it and go. |

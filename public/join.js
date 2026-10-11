@@ -1,4 +1,4 @@
-// Duet Anything - audience phone: join the crowd with the room code, react during the show, vote on battle rounds.
+// dissPICable - audience phone: join the crowd with the room code, react during the show, vote on battle rounds.
 import { PLACEHOLDERS } from "./placeholders.js";
 import { listen as listenEvents } from "./events.js";
 

@@ -1,4 +1,4 @@
-// Duet Anything - 12 hand-drawn placeholder characters (original vector art, no network) so the
+// dissPICable - 12 hand-drawn placeholder characters (original vector art, no network) so the
 // idle gallery and the karaoke crowd are never empty. Art is SVG inner markup in a 200x200 box;
 // face + bbox are fractions 0-1 of that box, same shape as a real character from /api/characters.
 const dk = "#1a1a1f";

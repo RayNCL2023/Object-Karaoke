@@ -1,7 +1,7 @@
-# MLH submission - Duet Anything
+# MLH submission - dissPICable
 
 ## Name
-Duet Anything
+dissPICable
 
 ## Tagline options
 1. Snap any object. It sings a duet with you. Then it roasts you. **<- pick this one**

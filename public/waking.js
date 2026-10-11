@@ -1,4 +1,4 @@
-// Duet Anything - stage "waking up" moment (photo-received -> song-ready).
+// dissPICable - stage "waking up" moment (photo-received -> song-ready).
 // The snapped photo gets cut out like a zine sticker (dashed scissor line), googly eyes pop on, limbs doodle in,
 // Manc status lines type out, and a hazard-tape progress bar creeps toward 90% until the song is ready.
 // Transform/opacity animations only. Styles live in stage.css (.wk-*). Self-contained: listens to /api/events itself.

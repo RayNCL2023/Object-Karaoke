@@ -4,7 +4,7 @@
 
 Yesterday my water bottle called me "our kid" and gave my singing 41 out of 100. Fair, to be honest.
 
-At Hacktoberfest Hack Day Manchester, Debanjan Ray and I built **Duet Anything** in a single day: snap any object with your phone, it comes alive as a cheeky Mancunian character, sings a karaoke duet with you, then roasts your performance.
+At Hacktoberfest Hack Day Manchester, Debanjan Ray and I built **dissPICable** in a single day: snap any object with your phone, it comes alive as a cheeky Mancunian character, sings a karaoke duet with you, then roasts your performance.
 
 How it works:
 🎤 Gemma 4 (via the Gemini API) looks at the photo, invents the character and writes the song

@@ -42,7 +42,7 @@ const cf = path.join(root, "launcher", "bin", "cloudflared.exe");
 if (fs.existsSync(cf)) { fs.copyFileSync(cf, path.join(out, "cloudflared.exe")); console.log("bundled cloudflared.exe (any-Wi-Fi link on by default)"); }
 else console.log("no launcher/bin/cloudflared.exe: the exe will use Wi-Fi links only");
 fs.writeFileSync(path.join(out, "HOW-TO-RUN.txt"),
-`Duet Anything for Windows
+`dissPICable for Windows
 1. Keep DuetAnything.exe next to the public folder.
 2. Double-click DuetAnything.exe. The stage opens in its own Edge window (Chrome or your browser if Edge is missing).
 3. First launch: paste your Gemini and ElevenLabs keys on the setup screen. They are saved in %APPDATA%\\DuetAnything\\.env.

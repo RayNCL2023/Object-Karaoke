@@ -1,4 +1,4 @@
-// Duet Anything - OBJECT vs OBJECT on the trainer's phone (mic.html; lib/ovo.mjs). mic.js posts the snap as usual;
+// dissPICable - OBJECT vs OBJECT on the trainer's phone (mic.html; lib/ovo.mjs). mic.js posts the snap as usual;
 // an OvO reply comes here ("ovo-snapped"). Same phone snapping both: "NOW SNAP OBJECT 2". Then the trainers get a big
 // HYPE button for their own object (cheer bursts + hype meter on that side of the stage), and the result at the end.
 import { listen } from "./events.js";

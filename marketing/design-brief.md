@@ -1,7 +1,7 @@
 # Pitch deck brief - 6 slides
 
 ## Brand notes
-- **Name:** Duet Anything (always two words, both capitalised).
+- **Name:** dissPICable (always two words, both capitalised).
 - **Feel:** a dark stage just before the spotlight hits. Playful, loud, a bit daft, never messy.
 - **Palette:**
   - Stage black `#0d0d12` (background)
@@ -17,7 +17,7 @@
 ## Slide by slide
 
 ### 1. Title
-- **Headline:** Duet Anything
+- **Headline:** dissPICable
 - **Sub:** Snap any object. It sings a duet with you. Then it roasts you.
 - **Visual:** a mug with cartoon eyes under a red spotlight, singing into a mic.
 - **Footer:** Kaif Nadeem + Debanjan Ray · Hacktoberfest Hack Day Manchester · 11 Oct 2026

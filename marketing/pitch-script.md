@@ -5,7 +5,7 @@
 | Time | Who | Say / do |
 |---|---|---|
 | 0:00 | **Kaif** | *(Holds up phone.)* "Everyone's done karaoke. Nobody's done karaoke with their water bottle. Until today." |
-| 0:10 | **Kaif** | "This is Duet Anything. Snap any object, it comes alive as a cheeky Manc, sings a duet with you, then roasts you." |
+| 0:10 | **Kaif** | "This is dissPICable. Snap any object, it comes alive as a cheeky Manc, sings a duet with you, then roasts you." |
 | 0:20 | **Debanjan** | *(Walks to a judge.)* "Can I borrow that?" *(Judge's water bottle or lanyard. If they say no, use the backup object.)* *(Snap it. Stage shows "Waking it up...")* |
 | 0:25 | **Debanjan** | *(While it loads, about 10 seconds.)* "Right now Gemma 4 is looking at the photo, checking its memory, and writing a character and a song. ElevenLabs is giving it a voice." |
 | 0:35 | *both* | *(Character appears. Read its name out with a straight face.)* Let it sing line one. |

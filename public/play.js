@@ -1,4 +1,4 @@
-// Duet Anything - /play: room code + name, then BATTLE (player on the mic, lib/players.mjs) or JUDGE (crowd, join.html).
+// dissPICable - /play: room code + name, then BATTLE (player on the mic, lib/players.mjs) or JUDGE (crowd, join.html).
 const $ = (id) => document.getElementById(id);
 const STORE = "duetPlayer";
 const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } };

@@ -1,4 +1,4 @@
-// Duet Anything - kinetic captions (rap-video / TikTok style) for the stage lyrics area.
+// dissPICable - kinetic captions (rap-video / TikTok style) for the stage lyrics area.
 // One chunk (max ~6 words) at a time, big and centred. Words pop in exactly when spoken; the punchline word
 // slams in on a yellow sticker block. "You said" transcripts type out on a white torn-paper strip instead.
 // Timing: audio element currentTime (real MP3s), speechSynthesis word boundaries, or a per-word estimate.

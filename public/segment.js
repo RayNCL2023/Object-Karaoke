@@ -1,4 +1,4 @@
-// Duet Anything - real object cut-out in the browser (MediaPipe InteractiveSegmenter, magic_touch).
+// dissPICable - real object cut-out in the browser (MediaPipe InteractiveSegmenter, magic_touch).
 // cutout(img, {x,y}) -> { maskCanvas, borderCanvas, bbox, face } in 0..1 image coords, or null on any failure.
 const VER = "0.10.14";
 const CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}`;

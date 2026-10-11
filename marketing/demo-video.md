@@ -12,7 +12,7 @@ Record the laptop stage (OBS or Win+G) with the phone screen picture-in-picture 
 | 6 | 0:40-0:50 | It fires a comeback that quotes what you just said. | **It actually listens and hits back** |
 | 7 | 0:50-0:58 | Judges' phones: Cheer / Fire / vote "who won that round". | **3. The crowd votes on their phones** |
 | 8 | 0:58-1:10 | Verdict: score counts up, category reasons, roast, winner. | **Judged on what you really said** |
-| 9 | 1:10-1:15 | End card: name, tagline, repo link. | **Duet Anything · Gemma 4 · ElevenLabs · Built at Hack Day Manchester** |
+| 9 | 1:10-1:15 | End card: name, tagline, repo link. | **dissPICable · Gemma 4 · ElevenLabs · Built at Hack Day Manchester** |
 
 ## Notes
 - Keep every caption under 8 words, big, bottom third, white on dark.

@@ -1,4 +1,4 @@
-// Duet Anything - karaoke SONG PICKER (stage idle, karaoke mode) + REAL SONGS runner (embedded YouTube karaoke video).
+// dissPICable - karaoke SONG PICKER (stage idle, karaoke mode) + REAL SONGS runner (embedded YouTube karaoke video).
 // Copyright rule: we only store originals (Gemma writes them) or public-domain lyrics. Real songs are an embedded
 // official karaoke video via the YouTube IFrame Player API: embed only, player visible with its own controls/branding.
 (function () {

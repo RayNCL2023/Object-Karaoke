@@ -1,4 +1,4 @@
-// Duet Anything - wipe test data before a demo: npm run reset-data   (add --yes to skip the question, --dry-run to just list)
+// dissPICable - wipe test data before a demo: npm run reset-data   (add --yes to skip the question, --dry-run to just list)
 // Clears: cache/leaderboard.json, roster.json, characters.json, characters/ photos, session photos + audio (cache/s_*),
 // and this app's NMAFC memories (NMAFC_AGENT; NMAFC marks them invalidated, so recall stops returning them). Keeps: cache/tts/ and cache/sfx/ audio, designed-voices.json, room code, .env.
 // Data folder: DUET_DATA_DIR, else the project folder.

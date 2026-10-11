@@ -1,4 +1,4 @@
-# Duet Anything — build spec (shared by every bot on the team)
+# dissPICable — build spec (shared by every bot on the team)
 
 **Pitch:** Snap any object with your phone. It comes alive as a cheeky Mancunian character and sings a karaoke DUET with you. You sing your lines into your phone like a mic; the object sings back, then roasts your performance and scores you. It remembers every object it has met, so the same mug always has the same name, voice and grudges.
 
@@ -21,7 +21,7 @@ Tracks (all 8): Gemma 4 · Open-Source AI · ElevenLabs · OpenLoft (NMAFC memor
 - Existing: `public/api.js` (helpers; may be extended), `public/test.html` (feature test page; leave alone), `public/phone.html` (old pads; leave alone).
 
 ## Flow
-1. Stage idle: big title "Duet Anything", the phone URL (from `/api/status` → `phoneUrl`, but point it at `/mic.html`) and a short "Snap anything to start".
+1. Stage idle: big title "dissPICable", the phone URL (from `/api/status` → `phoneUrl`, but point it at `/mic.html`) and a short "Snap anything to start".
 2. Phone: big **Snap** button (`<input type="file" accept="image/*" capture="environment">`), shrinks the photo to max 1024px JPEG in a canvas, POSTs `/api/object`. Shows "Waking it up…".
 3. Server `/api/object` (uses the current **mode**, `battle` default or `karaoke`, toggled on the stage idle screen / key M → `POST /api/mode`): recall memory → one Gemma 4 call (JSON, random naming style + do-not-reuse name list) → voice → MP3s → remember → broadcast `song-ready` → return the session.
 4. **Roast battle (main mode, freestyle, NO lyrics for the user):** object raps its opener (2–4 savage rhyming bars, ≤ 200 chars, its lyrics show). Then 3 rounds: stage shows "FREESTYLE!" + big countdown and broadcasts `record-start {line: round, round, ms: youMs (12000)}`; phone shows "FREESTYLE! Roast it back 🎤" + seconds countdown (no lyric text), records, POSTs `/api/take`. Server: speech-to-text → broadcast `take-heard` (stage shows what you actually said) → one fast Gemma call writes the object's COMEBACK twisting your words (≤ 180 chars; silence gets mocked) → TTS → `take-received` with the comeback → stage plays it with its text as lyrics. Round 3 has no comeback: straight to judging.

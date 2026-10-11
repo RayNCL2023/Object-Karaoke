@@ -1,4 +1,4 @@
-// Duet Anything - OBJECT vs OBJECT stage (lib/ovo.mjs). Self-contained overlay over the stage (stage.js never sees
+// dissPICable - OBJECT vs OBJECT stage (lib/ovo.mjs). Self-contained overlay over the stage (stage.js never sees
 // OvO events, so VS THE OBJECT / PvP are untouched). Two cut-out characters LEFT vs RIGHT facing each other (the right
 // one's pose/eyes face left; the photo itself is never mirrored so its text stays readable), googly eyes, mouths driven by their own audio, rubber-hose limbs, kinetic captions on the speaker's
 // side, hype meters fed by the trainers' phones, round votes, verdict. Key O = offline demo with two placeholder objects.

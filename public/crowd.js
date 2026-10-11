@@ -1,4 +1,4 @@
-// Duet Anything - character roster: idle gallery + animated karaoke crowd.
+// dissPICable - character roster: idle gallery + animated karaoke crowd.
 // Real saved characters (GET /api/characters) first, topped up with placeholders to 12.
 // Crowd motion is transform/opacity only; one rAF tick (driven by stage.js) for all members.
 import { PLACEHOLDERS } from "./placeholders.js";

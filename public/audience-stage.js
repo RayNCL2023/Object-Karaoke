@@ -1,4 +1,4 @@
-// Duet Anything - stage side of the Jackbox-style audience (loaded after stage.js).
+// dissPICable - stage side of the Jackbox-style audience (loaded after stage.js).
 // Idle: room code + join QR + a tiny Keys corner (localhost only). Show: phone members in the crowd (window.crowd),
 // reaction bubbles, a crowd energy meter and a live "who won that round?" tally.
 const $ = (id) => document.getElementById(id);

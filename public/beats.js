@@ -1,4 +1,4 @@
-// beats.js - Duet Anything backing-beat engine (Music track).
+// beats.js - dissPICable backing-beat engine (Music track).
 // Needs Tone.js on window.Tone. Verified working URL (HTTP 200, 2026-10-11):
 //   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.min.js"></script>
 // Exports: startBeat({genre,bpm,key}) -> Promise, stopBeat(), getBeatPulse() -> 0..1,

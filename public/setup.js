@@ -1,4 +1,4 @@
-// Duet Anything - first-launch key setup. Keys only ever go to this laptop's own server (localhost).
+// dissPICable - first-launch key setup. Keys only ever go to this laptop's own server (localhost).
 const $ = (id) => document.getElementById(id);
 const force = /[?&]force=1\b/.test(location.search) ? "?force=1" : "";
 

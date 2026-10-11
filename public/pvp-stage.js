@@ -1,4 +1,4 @@
-// Duet Anything - stage side of multi-player (loaded after stage.js; lib/players.mjs + lib/pvp.mjs on the server).
+// dissPICable - stage side of multi-player (loaded after stage.js; lib/players.mjs + lib/pvp.mjs on the server).
 // Idle: player lobby (zine chips), audience count, match picker (VS THE OBJECT / PLAYER vs PLAYER).
 // Show: PvP banner (both names, whose turn, their latest bars) + relabels "You said" cards with the player's name.
 // Result: PvP verdict panel (winner + both players' marks and roasts).

@@ -1,4 +1,4 @@
-// Duet Anything - TEST MIC overlay (phone). Big live level meter, "SAY SOMETHING... / GOT YOU!", records ~2.5 s and
+// dissPICable - TEST MIC overlay (phone). Big live level meter, "SAY SOMETHING... / GOT YOU!", records ~2.5 s and
 // plays it back, plain fixes if silent. Passing marks the phone "MIC OK" (localStorage) and tells the stage
 // ({type:'mic-check', client, player, playerName, ok}). Used by mic.html (shared stream) and play.html (own stream).
 const OK_KEY = "duetMicOk";

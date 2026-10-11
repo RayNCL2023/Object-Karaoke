@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Duet Anything Promo</title>
+<title>dissPICable Promo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.js"></script>
@@ -279,7 +279,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #111; }
   <!-- 9 End card -->
   <section class="scene" id="s9">
     <div class="marq">Snap anything &#9733; battle it &#9733; our kid &#9733; absolute weapon &#9733; Snap anything &#9733; battle it &#9733; our kid &#9733; absolute weapon &#9733; Snap anything &#9733; battle it &#9733; our kid &#9733; absolute weapon &#9733; Snap anything &#9733; battle it &#9733; our kid &#9733; absolute weapon &#9733;</div>
-    <div class="logo"><span class="pop">Duet Anything</span></div>
+    <div class="logo"><span class="pop">dissPICable</span></div>
     <div class="tagline pop d1">snap anything, then battle it.</div>
     <div class="repo pop d2"><b>tinyurl.com/duetanything-repo</b></div>
     <div class="char cool talking slot pop d3"></div>
@@ -431,3 +431,5 @@ if (new URLSearchParams(location.search).has("auto")) start();
 <style>body:has(#s9.on) .brand { color: var(--yellow); }</style>
 <style>#s9 .char { display: none !important; }</style>
 <style>.shades, .chain { display: none !important; }</style>
+<style>.brand, #s9 .logo, #s9 .logo span { text-transform: none !important; }</style>
+<script>addEventListener("keydown", function (e) { if (e.key === "Escape" && window.parent !== window) window.parent.postMessage("promo-close", "*"); });</script>
