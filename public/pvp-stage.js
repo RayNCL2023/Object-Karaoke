@@ -82,6 +82,7 @@ function renderLobby() {
   const sel = duo ? match.players || [] : [match.current];
   $("lobChips").innerHTML = players.length
     ? players.map((p) => {
+      if (p.pending) return `<span class="lob-chip pending"><i style="background:${esc(p.colour)}"></i>${esc(p.name)} wants to battle <button type="button" class="lob-yes" data-approve="${esc(p.id)}" data-ok="1">&#10003; Let in</button><button type="button" class="lob-no" data-approve="${esc(p.id)}" data-ok="0">&#10007; Judge</button></span>`;
       const k = sel.indexOf(p.id);
       const tag = k < 0 ? "" : match.type === "pvp" ? `P${k + 1}` : match.type === "ovo" ? `OBJ ${k + 1}` : "UP NEXT";
       return `<button type="button" class="lob-chip${k >= 0 ? " on" : ""}" data-id="${esc(p.id)}"><i style="background:${esc(p.colour)}"></i>${esc(p.name)}${micOk.has(p.id) ? `<b class="lob-micok ${micOk.get(p.id) ? "y" : "n"}">${micOk.get(p.id) ? "&#10003; MIC" : "&#10007; MIC"}</b>` : ""}${tag ? `<em>${tag}</em>` : ""}</button>`;
@@ -104,6 +105,8 @@ function renderLobby() {
   $("lobHint").textContent = hint;
 }
 $("lobChips").addEventListener("click", (e) => {
+  const ap = e.target.closest("[data-approve]");
+  if (ap) { e.stopPropagation(); post("/api/players/approve", { playerId: ap.dataset.approve, ok: ap.dataset.ok === "1" }).then(applyPlayers).catch(() => {}); return; }
   const b = e.target.closest(".lob-chip");
   if (!b) return;
   e.stopPropagation();

@@ -245,7 +245,7 @@ async function objectRoute(req, res) {
 // ---------- host lock: paid / admin endpoints only from the laptop (localhost) or with the per-run HOST_TOKEN ----------
 const HOST_TOKEN = env("HOST_TOKEN") || crypto.randomBytes(16).toString("hex");
 const hostOk = (req) => setup.isLocal(req) || req.headers["x-host-token"] === HOST_TOKEN || new URL(req.url, "http://x").searchParams.get("token") === HOST_TOKEN;
-const HOST_ONLY = /^(POST \/api\/(gemma|speak|sfx|mode|difficulty|match|karaoke\/(pick|start|heckle))|GET \/api\/voices|(GET|POST) \/api\/memory\/.*|(GET|POST) \/api\/setup\/.+)$/;
+const HOST_ONLY = /^(POST \/api\/(gemma|speak|sfx|mode|difficulty|match|players\/approve|karaoke\/(pick|start|heckle))|GET \/api\/voices|(GET|POST) \/api\/memory\/.*|(GET|POST) \/api\/setup\/.+)$/;
 
 // SOLO_MODE (default on): demo focuses on YOU vs THE OBJECT. PvP / object vs object / karaoke stay in the code; SOLO_MODE=0 brings them back.
 const SOLO = env("SOLO_MODE", "1") !== "0";

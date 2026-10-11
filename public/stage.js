@@ -1016,7 +1016,7 @@ async function judge(myRun) {
     console.warn("[stage] judge failed, local verdict", e.message);
     const accs = [...takes.values()].map((t) => t.accuracy);
     const avg = accs.length ? accs.reduce((a, b) => a + b, 0) / accs.length : 0.5;
-    v = { score: Math.round(30 + avg * 50), roast: "Is that it? Absolute shambles. My kettle's got better bars than you, our kid." };
+    v = { score: Math.round(30 + avg * 50), roast: "Is that it? Absolute shambles. My kettle's got better bars than you." };
     if (session?.demo && session.battle) {
       v = { score: 58 + Math.round(Math.random() * 20), roast: "Hold my tea? You couldn't hold a tune. Best line was the dust one, our kid, and even that was dusty.", best: DEMO_BARS[2][0], worst: "(silence)", categories: { wit: 6, rhymes: 4, comebacks: 5, confidence: 7 } };
       if (crowdTally?.total) { v.score = Math.max(0, Math.min(100, v.score + crowdTally.bonus)); v.crowd = { player: crowdTally.player, object: crowdTally.object, bonus: crowdTally.bonus }; }

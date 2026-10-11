@@ -30,7 +30,7 @@ if (player) {
   // Heartbeat every 10 s. A new server "boot" id = the server restarted, so any battle this phone was in is gone: back to the start.
   let boot = null;
   const ping = () => fetch("/api/players/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playerId: player.id, name: player.name, code: player.code }) })
-    .then((r) => r.json()).then((r) => { if (r?.boot && boot && r.boot !== boot && !state.recording) reset(); if (r?.boot) boot = r.boot; }).catch(() => {});
+    .then((r) => r.json()).then((r) => { if (r?.boot && boot && r.boot !== boot && !state.recording) reset(); if (r?.boot) boot = r.boot; if (r?.player) window.duetPending?.(!!r.player.pending); }).catch(() => {});
   ping(); setInterval(ping, 10000);
   // Leaving the page (closed tab / switched to judging) frees the slot straight away.
   addEventListener("pagehide", () => { try { navigator.sendBeacon("/api/players/leave", new Blob([JSON.stringify({ playerId: player.id })], { type: "application/json" })); } catch { /* ignore */ } });
@@ -463,6 +463,8 @@ function connect() {
       case "record-start": onRecordStart(ev); break;
       case "verdict": onVerdict(ev); break;
       case "reset": reset(); break;
+      case "players": if (player) { const me = (ev.players || []).find((p) => p.id === player.id); if (me) window.duetPending?.(!!me.pending); } break;
+      case "player-declined": if (player && ev.playerId === player.id) goJudge(); break;
       case "photo-received": if (state.screen === "snapScreen") { show("wakeScreen"); } break;
     }
   }, { onOpen: () => $("dot").classList.add("on"), onError: () => $("dot").classList.remove("on") });
@@ -477,3 +479,19 @@ if (!window.isSecureContext && location.protocol === "http:" && lanHost) {
   if (!wakeSupported) $("wakeTip")?.classList.remove("hidden");
   if (!micSupported()) micTip(`Mic blocked on this link. Open the <b>https://</b> link shown on the stage (tap Advanced → Proceed once).<br>The stage will use the laptop mic for now.`);
 }
+
+// ---------- Host approval: new players wait until the laptop lets them in; declined = off to the judges ----------
+function goJudge() {
+  const q = new URLSearchParams(location.search);
+  location.href = `/join.html?${new URLSearchParams({ code: q.get("code") || player?.code || "", name: q.get("name") || player?.name || "" })}`;
+}
+window.duetPending = (on) => {
+  let ov = document.getElementById("pendingOv");
+  if (!on) { ov?.remove(); return; }
+  if (ov) return;
+  ov = document.createElement("div"); ov.id = "pendingOv";
+  ov.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;background:#e9e4d6;color:#111;font-family:Anton,Impact,sans-serif";
+  ov.innerHTML = `<div style="font-size:44px;line-height:1;text-transform:uppercase">Waiting for the host</div><div style="font:700 18px/1.4 monospace">The big screen has to let you in to battle.</div><button type="button" id="pendJudge" style="font:700 18px monospace;padding:12px 18px;border:4px solid #111;background:#ffd400;color:#111;box-shadow:5px 5px 0 #111">Judge instead &rarr;</button>`;
+  document.body.appendChild(ov);
+  ov.querySelector("#pendJudge").addEventListener("click", goJudge);
+};
