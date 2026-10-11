@@ -3,86 +3,130 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0b0b10">
+<meta name="theme-color" content="#ece6d6">
 <title>Duet Anything - Mic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0b0b10; --fg:#fff; --dim:#9a9aae; --accent:#ff5a36; --ok:#3ddc84; }
+  /* Madchester Rave Zine - phone mic. Paper, ink, hazard tape, hard shadows. */
+  :root { --paper:#ece6d6; --ink:#111; --accent:#ff4f9a; --yellow:#ffd400; --grey:#5a5442; --ok:#1f9d55;
+    --anton:"Anton", Impact, "Arial Narrow", sans-serif; --mono:"Space Mono", "Courier New", monospace;
+    --hazard:repeating-linear-gradient(-45deg, #111 0 18px, #ffd400 18px 36px); }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
-  body { display:flex; flex-direction:column; }
-  header { padding:14px 18px 0; display:flex; justify-content:space-between; align-items:center;
-    font-weight:800; letter-spacing:.02em; font-size:15px; color:var(--dim); }
-  header b { color:var(--fg); }
-  #dot { width:10px; height:10px; border-radius:50%; background:#555; display:inline-block; margin-right:6px; transition:background .3s; }
+  html,body { margin:0; height:100%; background:var(--paper); color:var(--ink); font-family:var(--mono); overflow:hidden; }
+  body { display:flex; flex-direction:column; position:relative; }
+  body::before { content:""; flex:0 0 34px; background:var(--hazard); border-bottom:4px solid #111; }
+  body::after { content:""; position:fixed; inset:0; pointer-events:none; opacity:.2; mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.07 0 0 0 0 0.07 0 0 0 0 0.07 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  header { padding:12px 18px 0; display:flex; justify-content:space-between; align-items:center;
+    font-weight:700; letter-spacing:.08em; font-size:14px; text-transform:uppercase; color:var(--ink); }
+  header b { background:#111; color:var(--yellow); padding:2px 8px; }
+  #hdrRight { border:3px solid #111; background:#fff; padding:0 8px; }
+  #dot { width:12px; height:12px; background:#8a8478; border:2px solid #111; display:inline-block; margin-right:8px; vertical-align:-1px; }
   #dot.on { background:var(--ok); }
   main { flex:1; position:relative; }
   .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:24px 20px calc(24px + env(safe-area-inset-bottom)); text-align:center; gap:22px;
-    opacity:0; transform:translateY(16px) scale(.98); pointer-events:none;
-    transition:opacity .35s ease, transform .45s cubic-bezier(.2,.8,.2,1); }
+    padding:20px 24px calc(24px + env(safe-area-inset-bottom)); text-align:center; gap:22px;
+    opacity:0; transform:translateY(16px); pointer-events:none;
+    transition:opacity .3s ease, transform .4s cubic-bezier(.2,.8,.2,1); }
   .screen.show { opacity:1; transform:none; pointer-events:auto; }
-  h1 { font-size:clamp(34px, 10vw, 60px); line-height:1.02; margin:0; font-weight:900; }
-  h2 { font-size:clamp(22px, 6.5vw, 34px); margin:0; font-weight:800; line-height:1.1; }
-  p { margin:0; font-size:20px; color:var(--dim); line-height:1.35; max-width:30ch; }
-  .big { width:min(78vw, 340px); aspect-ratio:1; border-radius:50%; border:0; background:var(--accent); color:#fff;
-    font-size:clamp(40px, 13vw, 64px); font-weight:900; box-shadow:0 0 0 10px rgba(255,255,255,.06), 0 20px 60px rgba(0,0,0,.6);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; cursor:pointer;
-    transition:transform .15s ease; animation:breathe 2.6s ease-in-out infinite; }
-  .big small { font-size:18px; font-weight:700; opacity:.85; }
-  .big:active { transform:scale(.95); }
-  .pill { border:0; border-radius:999px; padding:22px 34px; font-size:24px; font-weight:900; background:var(--fg); color:#000;
-    width:min(86vw, 380px); cursor:pointer; transition:transform .15s; }
-  .pill:active { transform:scale(.96); }
-  @keyframes breathe { 50% { transform:scale(1.04); } }
+  h1 { font:400 clamp(56px, 19vw, 84px)/.92 var(--anton); text-transform:uppercase; margin:0; align-self:flex-start; text-align:left; }
+  h1 .hl { background:var(--accent); padding:2px 8px 0; display:inline-block; margin-top:6px; transform:rotate(-1.5deg); }
+  h2 { font:400 clamp(34px, 10vw, 48px)/1 var(--anton); text-transform:uppercase; margin:0; }
+  p { margin:0; font-size:18px; color:var(--ink); line-height:1.4; max-width:30ch; }
+  .big { width:min(66vw, 250px); aspect-ratio:1; border:5px solid #111; border-radius:0; background:#111; color:var(--yellow);
+    font:400 clamp(52px, 16vw, 72px)/1 var(--anton); box-shadow:10px 10px 0 var(--accent); transform:rotate(-3deg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease; }
+  .big small { font:700 15px/1.3 var(--mono); color:var(--paper); text-transform:uppercase; letter-spacing:.06em; padding:0 14px; }
+  .big:active { transform:rotate(-3deg) translate(6px, 6px); box-shadow:4px 4px 0 var(--accent); }
+  .pill { border:5px solid #111; border-radius:0; padding:18px 28px; font:400 30px/1 var(--anton); text-transform:uppercase; background:var(--yellow); color:#111;
+    width:min(86vw, 360px); cursor:pointer; box-shadow:8px 8px 0 #111; transition:transform .12s, box-shadow .12s; }
+  .pill:active { transform:translate(5px, 5px); box-shadow:3px 3px 0 #111; }
   input[type=file] { display:none; }
 
   /* waking */
-  .blob { width:150px; height:150px; border-radius:46% 54% 50% 50%; background:var(--accent); position:relative;
+  .blob { width:140px; height:140px; background:var(--accent); border:5px solid #111; box-shadow:8px 8px 0 #111; position:relative;
     animation:wobble 1.4s ease-in-out infinite; }
-  .blob::before, .blob::after { content:""; position:absolute; top:52px; width:22px; height:22px; border-radius:50%; background:#fff;
+  .blob::before, .blob::after { content:""; position:absolute; top:40px; width:26px; height:26px; border-radius:50%; background:#fff; border:4px solid #111;
     animation:blink 2.2s infinite; }
-  .blob::before { left:38px; } .blob::after { right:38px; }
-  .blob i { position:absolute; left:50%; bottom:34px; width:40px; height:14px; margin-left:-20px; border-radius:0 0 20px 20px; background:#2a0b05;
+  .blob::before { left:28px; } .blob::after { right:28px; }
+  .blob i { position:absolute; left:50%; bottom:28px; width:40px; height:14px; margin-left:-20px; background:#111;
     animation:yawn 1.4s ease-in-out infinite; }
-  @keyframes wobble { 0%,100% { transform:rotate(-6deg) translateY(0); } 50% { transform:rotate(6deg) translateY(-14px); } }
+  @keyframes wobble { 0%,100% { transform:rotate(-6deg) translateY(0); } 50% { transform:rotate(5deg) translateY(-12px); } }
   @keyframes blink { 0%,90%,100% { transform:scaleY(1); } 95% { transform:scaleY(.1); } }
   @keyframes yawn { 50% { transform:scaleY(1.9); } }
-  #quip { min-height:2.8em; font-size:24px; color:var(--fg); font-weight:700; transition:opacity .3s; }
-  .thumb { width:96px; height:96px; border-radius:50%; object-fit:cover; border:4px solid var(--accent); }
+  #quip { min-height:2.8em; font-size:20px; font-weight:700; transition:opacity .3s; background:#fff; border:4px solid #111; padding:10px 14px; transform:rotate(1deg); max-width:30ch; }
+  .thumb { width:96px; height:96px; object-fit:cover; border:5px solid #111; box-shadow:5px 5px 0 var(--accent); transform:rotate(3deg); }
 
-  /* ready */
-  .avatar { width:min(52vw, 220px); aspect-ratio:1; border-radius:50%; object-fit:cover; border:8px solid var(--accent);
-    animation:bob 1.2s ease-in-out infinite; background:color-mix(in srgb, var(--accent) 30%, #111); }
-  .avatar:not([src]) { content:""; }
-  @keyframes bob { 50% { transform:translateY(-10px) rotate(2deg); } }
-  .songtitle { color:var(--accent); font-size:22px; font-weight:800; }
-  .hold { font-size:clamp(28px, 8vw, 40px); font-weight:900; color:var(--fg); }
+  /* waking sticker: photo (or blob) with googly eyes, bouncing */
+  .wakeSticker { position:relative; animation:bounce 0.9s cubic-bezier(.3,1.6,.5,1) infinite alternate; }
+  .wakeSticker .thumb { width:150px; height:150px; border:7px solid #fff; outline:5px solid #111; box-shadow:10px 10px 0 var(--accent); transform:rotate(-4deg); }
+  .wakeSticker:has(#wakeThumb:not(.hidden)) .blob { display:none; }
+  .geyes { position:absolute; left:50%; top:30%; display:flex; gap:6px; transform:translateX(-50%); }
+  .geyes b { width:38px; height:38px; border-radius:50%; background:#fff; border:4px solid #111; position:relative; overflow:hidden; }
+  .geyes b::after { content:""; position:absolute; width:16px; height:16px; border-radius:50%; background:#111; left:9px; top:9px; animation:googly 1.1s ease-in-out infinite; }
+  .geyes b + b::after { animation-delay:-.4s; }
+  .wakeSticker:not(:has(#wakeThumb:not(.hidden))) .geyes { display:none; }
+  @keyframes bounce { from { transform:translateY(0) rotate(-2deg); } to { transform:translateY(-16px) rotate(2deg); } }
+  @keyframes googly { 0%,100% { transform:translate(6px,6px); } 33% { transform:translate(-7px,4px); } 66% { transform:translate(3px,-6px); } }
+  #wakeScreen #quip { font:400 26px/1.1 var(--anton); text-transform:uppercase; }
+  .prog { width:min(84vw, 340px); height:26px; border:4px solid #111; background:#fff; overflow:hidden; box-shadow:5px 5px 0 #111; }
+  .prog b { display:block; height:100%; background:var(--hazard); transform-origin:left; transform:scaleX(.03); }
+  #wakeScreen.show .prog b { animation:creep 15s cubic-bezier(.15,.6,.3,1) forwards; }
+  @keyframes creep { to { transform:scaleX(.9); } }
 
-  /* record */
-  #recScreen { background:radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%); }
-  .yourline { font-size:14px; letter-spacing:.3em; font-weight:900; color:var(--accent); }
-  #lineText { font-size:clamp(34px, 10vw, 58px); font-weight:900; line-height:1.08; color:#fff; max-width:14ch; }
-  .micwrap { position:relative; width:170px; height:170px; display:grid; place-items:center; }
-  .ring { position:absolute; inset:0; border-radius:50%; background:var(--accent); opacity:.35; transform:scale(1);
-    transition:transform .08s linear; }
-  .mic { position:relative; width:120px; height:120px; border-radius:50%; background:var(--accent); display:grid; place-items:center;
-    animation:pulse 1s ease-in-out infinite; }
-  .mic svg { width:58px; height:58px; fill:#fff; }
-  @keyframes pulse { 50% { transform:scale(1.07); } }
-  .meter { width:min(80vw, 340px); height:18px; border-radius:9px; background:rgba(255,255,255,.12); overflow:hidden; }
-  .meter b { display:block; height:100%; width:100%; background:linear-gradient(90deg, var(--ok), #ffd23f, var(--accent));
-    transform-origin:left; transform:scaleX(0); transition:transform .06s linear; }
-  .timer { width:min(80vw, 340px); height:6px; border-radius:3px; background:rgba(255,255,255,.12); overflow:hidden; }
-  .timer b { display:block; height:100%; background:#fff; transform-origin:left; transform:scaleX(1); }
+  /* ready: SPIT BARS. */
+  #readyScreen { align-items:stretch; justify-content:space-between; }
+  .spit { align-self:flex-start; }
+  .readyRow { display:flex; align-items:center; gap:18px; text-align:left; }
+  .avatar { width:min(34vw, 140px); aspect-ratio:1; object-fit:cover; border:6px solid #fff; outline:5px solid #111; box-shadow:8px 8px 0 #111;
+    animation:bob 1.4s ease-in-out infinite; background:var(--accent); flex:0 0 auto; }
+  @keyframes bob { 50% { transform:translateY(-6px) rotate(-3deg); } }
+  .readyWho small { font-size:14px; font-weight:700; letter-spacing:.1em; }
+  #charName { font:400 clamp(30px, 9vw, 44px)/1 var(--anton); text-transform:uppercase; background:#111; color:var(--yellow); padding:4px 10px; display:inline-block; transform:rotate(2deg); }
+  .songtitle { margin-top:8px; font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+  .songtitle:empty { display:none; }
+  .hold { align-self:center; font:400 clamp(28px, 8.5vw, 38px)/1 var(--anton); text-transform:uppercase; background:var(--yellow); border:4px solid #111; padding:8px 14px; transform:rotate(-1deg); box-shadow:6px 6px 0 #111; }
+  #readyHint { align-self:center; text-align:center; }
+
+  /* record + waiting: the whole phone is a big handheld mic */
+  body:has(.micScreen.show) header { display:none; }
+  body:has(.micScreen.show)::before { display:none; }
+  .micScreen { padding:14px 0 0; gap:0; justify-content:flex-start; }
+  .bigmic { flex:1; width:100%; display:flex; flex-direction:column; align-items:center; min-height:0; }
+  .bigmic .head { position:relative; width:min(86vw, 46vh); aspect-ratio:1; flex:0 0 auto; display:grid; place-items:center; }
+  .bigmic .grille { position:relative; width:100%; height:100%; filter:drop-shadow(8px 8px 0 #111); }
+  .bigmic .ring { position:absolute; inset:2%; border-radius:50%; background:var(--accent); opacity:.85; transform:scale(1); transition:transform .08s linear; }
+  .bigmic.live .head::after { content:""; position:absolute; inset:-4%; border-radius:50%; border:6px solid var(--accent); animation:pulseRing 1.2s ease-out infinite; }
+  @keyframes pulseRing { from { transform:scale(.95); opacity:.9; } to { transform:scale(1.12); opacity:0; } }
+  .bigmic .collar { width:min(52vw, 28vh); height:34px; margin-top:-14px; background:var(--hazard); border:6px solid #111; position:relative; z-index:1; flex:0 0 auto; }
+  .bigmic .handle { flex:1; width:min(44vw, 23vh); min-height:0; background:#111; border:6px solid #111; border-top:0; border-radius:0 0 46px 46px;
+    display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px 10px calc(18px + env(safe-area-inset-bottom)); box-shadow:10px 0 0 var(--accent); }
+  .bigmic .band { width:calc(100% + 20px); background:var(--accent); border-top:5px solid #111; border-bottom:5px solid #111; padding:6px 4px; text-align:center;
+    font:400 22px/1.05 var(--anton); text-transform:uppercase; color:#111; }
+  .bigmic .band span { display:block; }
+  #lineText { font:400 clamp(44px, 14vw, 64px)/.9 var(--anton); color:var(--yellow); text-transform:uppercase; text-align:center; max-width:100%; overflow-wrap:anywhere; }
+  #lineText:empty { display:none; }
+  .meter { width:70%; height:14px; background:#333; border:3px solid #ece6d6; overflow:hidden; }
+  .meter b { display:block; height:100%; width:100%; background:var(--yellow); transform-origin:left; transform:scaleX(0); transition:transform .06s linear; }
+  .timer { width:70%; height:8px; background:#333; overflow:hidden; }
+  .timer b { display:block; height:100%; background:#ece6d6; transform-origin:left; transform:scaleX(1); }
+  .stop { margin-top:auto; font:700 13px var(--mono); text-transform:uppercase; letter-spacing:.08em; background:#ece6d6; color:#111; border:3px solid #ece6d6; border-radius:0; padding:6px 14px; cursor:pointer; }
+  .stop:active { transform:translate(2px,2px); }
+  #sentText { color:#ece6d6; font-size:15px; text-align:center; max-width:100%; padding:0 4px; }
+  .waitnote { margin-top:auto; color:var(--yellow); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; text-align:center; }
+  #sentScreen .grille { opacity:.85; }
 
   /* verdict */
-  .score { font-size:clamp(90px, 34vw, 160px); font-weight:900; line-height:.9; color:var(--accent); animation:pop .6s cubic-bezier(.2,1.6,.4,1); }
-  .score small { font-size:.3em; color:var(--dim); }
+  .score { font:400 clamp(110px, 40vw, 180px)/.85 var(--anton); color:#111; text-shadow:8px 8px 0 var(--accent); animation:pop .5s cubic-bezier(.2,1.6,.4,1); }
+  .score small { font:700 .16em var(--mono); text-shadow:none; }
   @keyframes pop { from { transform:scale(.3); opacity:0; } }
-  #roast { font-size:22px; color:var(--fg); font-weight:600; max-width:26ch; }
-  .tip { background:#2a1a00; color:#ffd23f; border:2px solid #ffd23f; border-radius:16px; padding:14px 16px; font-size:18px; font-weight:700; max-width:30ch; }
-  .tip code { background:rgba(0,0,0,.4); padding:2px 6px; border-radius:6px; }
+  #roast { font-size:18px; line-height:1.4; max-width:28ch; background:#fff; border:5px solid #111; box-shadow:8px 8px 0 #111; padding:14px 16px; text-align:left; transform:rotate(-1deg); }
+  #roast:empty { display:none; }
+  .tip { background:var(--yellow); color:#111; border:4px solid #111; padding:12px 14px; font-size:16px; font-weight:700; max-width:30ch; box-shadow:5px 5px 0 #111; text-align:left; }
+  .tip code { background:#fff; border:2px solid #111; padding:0 5px; }
   .hidden { display:none !important; }
   @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
 </style>
@@ -92,46 +136,81 @@
 <main>
   <!-- 1. Snap -->
   <section class="screen show" id="snapScreen">
-    <h1>Snap<br>anything.</h1>
+    <h1>Snap<br><span class="hl">anything.</span></h1>
     <label class="big" id="snapBtn" for="cam">SNAP<small>it'll sing with you</small></label>
     <input type="file" id="cam" accept="image/*" capture="environment">
     <p id="snapHint">Mug, trainer, your mate's head. Anything.</p>
     <div class="tip hidden" id="micTip"></div>
   </section>
 
-  <!-- 1b. Waking -->
+  <!-- 1b. Waking: googly-eye sticker + photocopied status lines -->
   <section class="screen" id="wakeScreen">
-    <img class="thumb hidden" id="wakeThumb" alt="">
-    <div class="blob"><i></i></div>
+    <div class="wakeSticker">
+      <img class="thumb hidden" id="wakeThumb" alt="">
+      <div class="blob"><i></i></div>
+      <span class="geyes" aria-hidden="true"><b></b><b></b></span>
+    </div>
     <h2>Waking it up...</h2>
-    <div id="quip">Giving it a brew...</div>
+    <div id="quip">CUTTING YOU OUT...</div>
+    <div class="prog" aria-hidden="true"><b></b></div>
   </section>
 
-  <!-- 2. Ready -->
+  <!-- 2. Ready (get ready: SPIT BARS.) -->
   <section class="screen" id="readyScreen">
-    <img class="avatar" id="avatar" alt="" onerror="this.removeAttribute('src')">
-    <h1 id="charName">Mug Jagger</h1>
-    <div class="songtitle" id="songTitle"></div>
+    <h1 class="spit">Spit<br><span class="hl">bars.</span></h1>
+    <div class="readyRow">
+      <img class="avatar" id="avatar" alt="" onerror="this.removeAttribute('src')">
+      <div class="readyWho"><small>VS</small><div id="charName">Mug Jagger</div><div class="songtitle" id="songTitle"></div></div>
+    </div>
     <div class="hold">Hold your phone<br>like a mic</div>
     <p id="readyHint">Watch the big screen. Your lines pop up here.</p>
     <div class="tip hidden" id="micTip2"></div>
   </section>
 
-  <!-- 3. Record -->
-  <section class="screen" id="recScreen">
-    <div class="yourline">YOUR LINE</div>
-    <div id="lineText">...</div>
-    <div class="micwrap"><div class="ring" id="ring"></div>
-      <div class="mic"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12h-2z"/></svg></div>
+  <!-- 3. Record: the whole phone IS the microphone -->
+  <section class="screen micScreen" id="recScreen">
+    <div class="bigmic live">
+      <div class="head">
+        <div class="ring" id="ring"></div>
+        <svg class="grille" viewBox="0 0 200 200" aria-hidden="true">
+          <defs>
+            <pattern id="mesh" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="14" height="14" fill="#2a2a2a"/><path d="M0 0H14M0 0V14" stroke="#8a8478" stroke-width="3"/>
+            </pattern>
+            <clipPath id="ball"><circle cx="100" cy="100" r="90"/></clipPath>
+          </defs>
+          <circle cx="100" cy="100" r="90" fill="url(#mesh)"/>
+          <path d="M40 60 Q70 22 120 18" fill="none" stroke="#ece6d6" stroke-width="10" stroke-linecap="round" opacity=".7" clip-path="url(#ball)"/>
+          <circle cx="100" cy="100" r="90" fill="none" stroke="#111" stroke-width="8"/>
+        </svg>
+      </div>
+      <div class="collar"></div>
+      <div class="handle">
+        <div class="band"><span class="yourline">ROUND 01</span></div>
+        <div id="lineText"></div>
+        <div class="meter"><b id="meter"></b></div>
+        <div class="timer"><b id="timer"></b></div>
+        <button class="stop" id="stopBtn" type="button">Stop</button>
+      </div>
     </div>
-    <div class="meter"><b id="meter"></b></div>
-    <div class="timer"><b id="timer"></b></div>
   </section>
 
-  <!-- 3b. Sent / waiting -->
-  <section class="screen" id="sentScreen">
-    <h1 id="sentTitle">Sound!</h1>
-    <p id="sentText">Got your bit. Keep watching the stage.</p>
+  <!-- 3b. Sent / waiting: same mic, switched off -->
+  <section class="screen micScreen" id="sentScreen">
+    <div class="bigmic">
+      <div class="head">
+        <svg class="grille" viewBox="0 0 200 200" aria-hidden="true">
+          <circle cx="100" cy="100" r="90" fill="url(#mesh)"/>
+          <circle cx="100" cy="100" r="90" fill="none" stroke="#111" stroke-width="8"/>
+        </svg>
+      </div>
+      <div class="collar"></div>
+      <div class="handle">
+        <div class="band"><span id="sentTitle">Sound!</span></div>
+        <p id="sentText">Got your bit. Keep watching the stage.</p>
+        <small class="waitnote">wait for your turn</small>
+      </div>
+    </div>
   </section>
 
   <!-- 4. Verdict -->

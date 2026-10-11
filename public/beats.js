@@ -354,7 +354,27 @@ function ensureStings() {
   return S;
 }
 
+// ElevenLabs Sound Effects pack (server generates once into cache/sfx/). Real recordings beat synth stings when present.
+const SFX = {};
+const SFX_ALIAS = { applause: 'cheer', ooh: 'ooooh', oooh: 'ooooh', laughter: 'laugh', mic: 'micdrop', 'mic drop': 'micdrop', 'record scratch': 'scratch' };
+const SFX_VOL = { cheer: 0.8, laugh: 0.75, boo: 0.7, ooooh: 0.85, airhorn: 0.6, scratch: 0.8, micdrop: 0.9, drumroll: 0.8 };
+function loadSfx() {
+  return fetch('/api/sfx-pack').then((r) => (r.ok ? r.json() : [])).then((list) => {
+    for (const { name, url } of list || []) { if (SFX[name]) continue; const a = new Audio(url); a.preload = 'auto'; SFX[name] = a; }
+  }).catch(() => {});
+}
+if (typeof window !== 'undefined') { loadSfx(); setTimeout(loadSfx, 20000); setTimeout(loadSfx, 60000); } // pack may still be generating at start
+/** Play an ElevenLabs sound effect (cheer, ooooh, boo, laugh, airhorn, scratch, micdrop, drumroll). Returns true if it played. */
+export function playSfx(name) {
+  const n = SFX_ALIAS[String(name || '').toLowerCase()] || String(name || '').toLowerCase();
+  const base = SFX[n];
+  if (!base) return false;
+  try { const a = base.cloneNode(); a.volume = SFX_VOL[n] ?? 0.8; a.play().catch(() => {}); return true; } catch { return false; }
+}
+if (typeof window !== 'undefined') window.playSfx = playSfx;
+
 export async function playSting(name) {
+  if (playSfx(name)) return 2.5;
   const Tn = T();
   await Tn.start();
   await ensureGraph();

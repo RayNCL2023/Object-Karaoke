@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ece6d6">
+<title>Duet Anything - Join the Crowd</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { --paper:#ece6d6; --ink:#111; --pink:#ff4f9a; --yellow:#ffd400; --grey:#8a8478; --me:#ff4f9a; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); font-family:"Space Mono", monospace; }
+  body { display:flex; flex-direction:column; min-height:100dvh; }
+  .hazard { height:30px; flex:0 0 auto; background:repeating-linear-gradient(-45deg,#111 0 18px,#ffd400 18px 36px); border-bottom:4px solid var(--ink); }
+  header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px 0; font-size:13px; font-weight:700; text-transform:uppercase; }
+  .logo { font-family:"Rubik Mono One", monospace; font-size:14px; }
+  #dot { display:inline-block; width:10px; height:10px; border:2px solid var(--ink); background:var(--grey); margin-right:6px; vertical-align:-1px; }
+  #dot.on { background:var(--yellow); }
+  main { flex:1; padding:18px 16px calc(24px + env(safe-area-inset-bottom)); }
+  .screen { display:none; flex-direction:column; gap:18px; }
+  .screen.show { display:flex; }
+  .screen > * { min-width:0; max-width:100%; }
+  html, body { overflow-x:hidden; }
+  h1 { font-family:"Anton", sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(52px, 17vw, 84px); line-height:.95; margin:4px 0 0; padding-top:4px; }
+  h1 .hl { background:var(--pink); padding:0 6px; }
+  h2 { font-family:"Anton", sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(28px, 9vw, 46px); line-height:.95; margin:0; overflow-wrap:anywhere; }
+  label { font-size:13px; font-weight:700; text-transform:uppercase; display:block; margin-bottom:6px; }
+  input[type=text] { width:100%; font:700 22px "Space Mono", monospace; padding:12px 14px; border:4px solid var(--ink); background:#fff; color:var(--ink); border-radius:0; text-transform:uppercase; }
+  input[type=text]:focus { outline:none; box-shadow:6px 6px 0 var(--pink); }
+  #code { font-family:"Anton", sans-serif; font-size:40px; letter-spacing:.2em; text-align:center; }
+  .avatars { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; }
+  .av { aspect-ratio:1; border:4px solid var(--ink); background:#fff; padding:4px; cursor:pointer; }
+  .av svg { width:100%; height:100%; display:block; }
+  .av.on { background:var(--yellow); box-shadow:5px 5px 0 var(--ink); transform:rotate(-3deg); }
+  .colours { display:flex; gap:8px; flex-wrap:wrap; }
+  .sw { width:44px; height:44px; border:4px solid var(--ink); cursor:pointer; }
+  .sw.on { box-shadow:5px 5px 0 var(--ink); transform:translate(-2px,-2px) rotate(4deg); }
+  .btn { font-family:"Anton", sans-serif; font-size:30px; text-transform:uppercase; padding:14px 18px; border:5px solid var(--ink); background:var(--pink); color:var(--ink); box-shadow:8px 8px 0 var(--ink); cursor:pointer; border-radius:0; }
+  .btn:active { transform:translate(6px,6px); box-shadow:2px 2px 0 var(--ink); }
+  .btn.alt { background:var(--yellow); }
+  .err { min-height:1.4em; font-weight:700; color:var(--ink); background:var(--yellow); padding:0 4px; align-self:flex-start; }
+  .err:empty { background:none; }
+  .me { display:flex; align-items:center; gap:12px; border:4px solid var(--ink); background:#fff; padding:8px 10px; box-shadow:6px 6px 0 var(--me); }
+  .me .face { width:52px; height:52px; flex:0 0 auto; }
+  .me b { font-family:"Anton", sans-serif; font-size:26px; font-weight:400; text-transform:uppercase; }
+  .me small { display:block; font-size:12px; color:var(--grey); text-transform:uppercase; }
+  .phase { border:5px solid var(--ink); background:var(--ink); color:var(--paper); padding:14px; transform:rotate(-1.5deg); box-shadow:8px 8px 0 var(--pink); }
+  .phase p { margin:6px 0 0; font-size:14px; color:var(--yellow); text-transform:uppercase; font-weight:700; }
+  .pads { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; }
+  .pad { aspect-ratio:1.05; border:5px solid var(--ink); box-shadow:8px 8px 0 var(--ink); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; cursor:pointer; font-family:"Anton", sans-serif; font-size:30px; text-transform:uppercase; color:var(--ink); border-radius:0; padding:6px; }
+  .pad svg { width:46%; height:auto; }
+  .pad:nth-child(1) { background:var(--pink); transform:rotate(-2deg); }
+  .pad:nth-child(2) { background:var(--yellow); transform:rotate(1.5deg); }
+  .pad:nth-child(3) { background:#fff; transform:rotate(1deg); }
+  .pad:nth-child(4) { background:var(--grey); transform:rotate(-1.5deg); }
+  .pad:active, .pad.hit { transform:translate(6px,6px) rotate(0); box-shadow:2px 2px 0 var(--ink); }
+  .pad.cool { opacity:.55; }
+  .vote { border:5px solid var(--ink); background:var(--yellow); padding:14px; box-shadow:8px 8px 0 var(--ink); display:none; flex-direction:column; gap:12px; transform:rotate(1deg); }
+  .vote.show { display:flex; }
+  .vote .row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
+  .vote button { font-family:"Anton", sans-serif; font-size:24px; line-height:1; text-transform:uppercase; padding:16px 8px; border:4px solid var(--ink); background:#fff; cursor:pointer; border-radius:0; color:var(--ink); }
+  .vote button.on { background:var(--ink); color:var(--yellow); }
+  .vote .tally { font-size:13px; font-weight:700; text-transform:uppercase; }
+  .leave { background:none; border:0; font:700 13px "Space Mono", monospace; text-decoration:underline; color:var(--grey); align-self:center; cursor:pointer; text-transform:uppercase; }
+</style>
+</head>
+<body>
+  <div class="hazard"></div>
+  <header><span class="logo">DUET ANYTHING</span><span><i id="dot"></i><span id="roomTag">CROWD</span></span></header>
+  <main>
+    <section class="screen show" id="joinScreen">
+      <h1>Join the<br><span class="hl">crowd.</span></h1>
+      <div><label for="code">Room code (on the big screen)</label><input id="code" type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="MANC"></div>
+      <div><label for="name">Your nickname</label><input id="name" type="text" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="OUR KID"></div>
+      <div><label>Pick your face</label><div class="avatars" id="avatars"></div></div>
+      <div><label>Pick your colour</label><div class="colours" id="colours"></div></div>
+      <p class="err" id="joinErr"></p>
+      <button class="btn" id="joinBtn" type="button">Get in &rarr;</button>
+    </section>
+
+    <section class="screen" id="crowdScreen">
+      <div class="me"><div class="face" id="meFace"></div><div><small>You're in the crowd</small><b id="meName"></b></div></div>
+      <div class="phase"><h2 id="phaseTitle">Waiting for a battle</h2><p id="phaseSub">Someone's snapping an object...</p></div>
+      <div class="vote" id="vote">
+        <h2 id="voteTitle">Who won that round?</h2>
+        <div class="row"><button type="button" data-v="player" id="votePlayer">The human</button><button type="button" data-v="object" id="voteObject">The object</button></div>
+        <p class="tally" id="voteTally"></p>
+      </div>
+      <div class="pads" id="pads">
+        <button class="pad" type="button" data-r="cheer"><svg viewBox="0 0 40 40"><path d="M6 34 L14 6 L22 26 L28 14 L34 34 Z" fill="#111"/></svg>Cheer</button>
+        <button class="pad" type="button" data-r="fire"><svg viewBox="0 0 40 40"><path d="M20 3 C26 12 32 16 32 25 A12 12 0 0 1 8 25 C8 19 12 16 14 11 C16 16 18 17 20 17 C20 12 18 8 20 3 Z" fill="#111"/></svg>Fire</button>
+        <button class="pad" type="button" data-r="laugh"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#111" stroke-width="4"/><path d="M11 22 Q20 34 29 22 Z" fill="#111"/><rect x="12" y="13" width="5" height="3" fill="#111"/><rect x="23" y="13" width="5" height="3" fill="#111"/></svg>Laugh</button>
+        <button class="pad" type="button" data-r="boo"><svg viewBox="0 0 40 40"><path d="M10 12 H30 V20 H24 L20 34 L16 34 L16 20 H10 Z" fill="#111"/></svg>Boo</button>
+      </div>
+      <button class="leave" id="leaveBtn" type="button">Leave the crowd</button>
+    </section>
+  </main>
+  <script type="module" src="join.js"></script>
+</body>
+</html>

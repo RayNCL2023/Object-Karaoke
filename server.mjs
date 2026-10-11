@@ -9,11 +9,15 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDuet } from "./lib/duet.mjs";
+import { createAudience } from "./lib/audience.mjs";
+import { createSetup } from "./lib/setup.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+// Desktop app: .env, cache/ and certs/ live in DUET_DATA_DIR (the app's user-data folder) instead of here.
+const dataDir = process.env.DUET_DATA_DIR || here;
 
 // Load .env (KEY=VALUE lines).
-const envFile = path.join(here, ".env");
+const envFile = path.join(dataDir, ".env");
 if (fs.existsSync(envFile)) {
   for (const line of fs.readFileSync(envFile, "utf8").replace(/^﻿/, "").split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
@@ -134,10 +138,15 @@ const readJson = (req) => new Promise((resolve, reject) => {
 });
 const sendJson = (res, code, obj) => res.writeHead(code, { "Content-Type": "application/json" }).end(JSON.stringify(obj));
 
-const duet = createDuet({ here, env, gemma, voices, remember, recall, broadcast: (e) => broadcast(e), readJson, sendJson });
+// Audience join link: plain http (no mic needed, so no certificate warning for the crowd).
+const audience = createAudience({ broadcast: (e) => broadcast(e), readJson, sendJson, joinUrl: () => `http://${lanIp()}:${PORT}/join.html` });
+const setup = createSetup({ here: dataDir, env, readJson, sendJson }); // .env lives in dataDir (DUET_DATA_DIR in the desktop app)
+const duet = createDuet({ here, env, gemma, voices, remember, recall, broadcast: (e) => broadcast(e), readJson, sendJson, crowdTally: (id) => audience.getTally(id) });
 
 const routes = {
   ...duet.routes,
+  ...audience.routes,
+  ...setup.routes,
   "POST /api/broadcast": async (req, res) => { broadcast({ ...(await readJson(req)), at: Date.now() }); sendJson(res, 200, { ok: true, listeners: listeners.size }); },
   "POST /api/gemma": async (req, res) => sendJson(res, 200, await gemma(await readJson(req))),
   "POST /api/speak": async (req, res) => res.writeHead(200, { "Content-Type": "audio/mpeg" }).end(await speak(await readJson(req))),
@@ -156,7 +165,7 @@ const routes = {
   "GET /api/status": async (req, res) => {
     let memory = false;
     try { await mem("/v1/memories/search", { agent_id: agent(), query: "ping", limit: 1 }, 3000); memory = true; } catch { /* not running */ }
-    sendJson(res, 200, { gemma: !!env("GEMINI_API_KEY"), elevenlabs: !!elevenKey(), memory, phoneUrl: phoneUrl(), micUrl: httpsReady ? micHttpsUrl() : phoneUrl().replace("/phone.html", "/mic.html"), mock: env("MOCK") === "1", mode: duet.getMode?.() || "battle" });
+    sendJson(res, 200, { gemma: !!env("GEMINI_API_KEY"), elevenlabs: !!elevenKey(), memory, phoneUrl: phoneUrl(), micUrl: httpsReady ? micHttpsUrl() : phoneUrl().replace("/phone.html", "/mic.html"), mock: env("MOCK") === "1", mode: duet.getMode?.() || "battle", needsSetup: setup.needsSetup(), roomCode: audience.code, joinUrl: `http://${lanIp()}:${PORT}/join.html` });
   },
 };
 
@@ -173,7 +182,7 @@ const HTTPS_PORT = PORT + 1;
 const micHttpsUrl = () => `https://${lanIp()}:${HTTPS_PORT}/mic.html`;
 let httpsReady = false;
 function certificate() {
-  const dir = path.join(here, "certs");
+  const dir = path.join(dataDir, "certs");
   const key = path.join(dir, "key.pem"), cert = path.join(dir, "cert.pem");
   if (!fs.existsSync(key) || !fs.existsSync(cert)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -192,7 +201,7 @@ async function handle(req, res) {
     catch (e) { console.error(`[${urlPath}]`, e.message); if (!res.headersSent) sendJson(res, 500, { error: e.message }); }
     return;
   }
-  const file = path.join(here, "public", urlPath === "/" ? "index.html" : urlPath);
+  const file = path.join(here, "public", urlPath === "/" ? (setup.needsSetup() ? "setup.html" : "index.html") : urlPath); // no keys yet: first-launch setup
   if (!file.startsWith(path.join(here, "public")) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return res.writeHead(404).end("Not found");
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
   fs.createReadStream(file).pipe(res);

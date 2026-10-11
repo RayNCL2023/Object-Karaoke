@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duet Anything - Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { --paper:#ece6d6; --ink:#111; --pink:#ff4f9a; --yellow:#ffd400; --grey:#8a8478; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); font-family:"Space Mono", monospace; }
+  .hazard { height:34px; background:repeating-linear-gradient(-45deg,#111 0 18px,#ffd400 18px 36px); border-bottom:4px solid var(--ink); }
+  .logo { font-family:"Rubik Mono One", monospace; font-size:16px; padding:14px 20px 0; }
+  main { max-width:760px; margin:0 auto; padding:24px 20px 60px; display:flex; flex-direction:column; gap:26px; }
+  h1 { font-family:"Anton", sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(56px, 11vw, 112px); line-height:.9; margin:0; }
+  h1 .hl { background:var(--pink); padding:0 8px; }
+  .lead { font-size:17px; line-height:1.5; margin:0; max-width:56ch; }
+  .key { border:5px solid var(--ink); background:#fff; padding:16px 18px; box-shadow:8px 8px 0 var(--ink); display:flex; flex-direction:column; gap:10px; }
+  .key:nth-of-type(1) { transform:rotate(-.8deg); } .key:nth-of-type(2) { transform:rotate(.6deg); box-shadow:8px 8px 0 var(--pink); }
+  .key h2 { font-family:"Anton", sans-serif; font-weight:400; text-transform:uppercase; font-size:34px; margin:0; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .key a { font:700 14px "Space Mono", monospace; color:var(--ink); background:var(--yellow); border:3px solid var(--ink); padding:4px 10px; text-decoration:none; text-transform:uppercase; white-space:nowrap; }
+  .key a:hover { box-shadow:4px 4px 0 var(--ink); }
+  .key p { margin:0; font-size:13px; color:var(--grey); }
+  input { width:100%; font:700 18px "Space Mono", monospace; padding:12px 14px; border:4px solid var(--ink); background:var(--paper); color:var(--ink); border-radius:0; }
+  input:focus { outline:none; box-shadow:6px 6px 0 var(--yellow); }
+  .st { font-weight:700; font-size:14px; text-transform:uppercase; min-height:1.3em; }
+  .st.ok { background:var(--yellow); align-self:flex-start; padding:0 6px; } .st.bad { background:var(--ink); color:var(--pink); align-self:flex-start; padding:0 6px; }
+  .row { display:flex; gap:18px; flex-wrap:wrap; }
+  button { font-family:"Anton", sans-serif; font-size:30px; text-transform:uppercase; padding:14px 22px; border:5px solid var(--ink); box-shadow:8px 8px 0 var(--ink); cursor:pointer; color:var(--ink); border-radius:0; }
+  button:active { transform:translate(6px,6px); box-shadow:2px 2px 0 var(--ink); }
+  button:disabled { opacity:.5; cursor:wait; }
+  #test { background:var(--yellow); } #save { background:var(--pink); }
+  #msg { font-weight:700; font-size:16px; min-height:1.4em; margin:0; }
+  .note { font-size:13px; color:var(--grey); margin:0; line-height:1.5; }
+  .blocked { border:5px solid var(--ink); background:var(--ink); color:var(--yellow); padding:16px; font-weight:700; display:none; }
+</style>
+</head>
+<body>
+  <div class="hazard"></div>
+  <div class="logo">DUET ANYTHING</div>
+  <main>
+    <h1>Plug in<br><span class="hl">your keys.</span></h1>
+    <p class="lead">Two free keys and the objects can see, think and sing. They stay on this laptop in <b>.env</b> and never go to the browser or the phone.</p>
+    <p class="blocked" id="blocked">Open this page on the laptop running the server (http://localhost:5173) to set the keys.</p>
+
+    <section class="key">
+      <h2>Gemini (Gemma 4) <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a key &nearr;</a></h2>
+      <input id="gemini" type="password" autocomplete="off" spellcheck="false" placeholder="paste your Google AI Studio key">
+      <p>Sees the photo, invents the character, writes the bars, judges you.</p>
+      <span class="st" id="geminiSt"></span>
+    </section>
+    <section class="key">
+      <h2>ElevenLabs <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener">Get a key &nearr;</a></h2>
+      <input id="elevenlabs" type="password" autocomplete="off" spellcheck="false" placeholder="paste your ElevenLabs key">
+      <p>Gives every object its voice and hears your freestyle.</p>
+      <span class="st" id="elevenlabsSt"></span>
+    </section>
+
+    <div class="row"><button id="test" type="button">Test keys</button><button id="save" type="button">Save &amp; start</button></div>
+    <p id="msg"></p>
+    <p class="note">Leave a box empty to keep the key you already have. No keys at all? Run <b>MOCK=1 node server.mjs</b> for a free demo.</p>
+  </main>
+  <script type="module" src="setup.js"></script>
+</body>
+</html>

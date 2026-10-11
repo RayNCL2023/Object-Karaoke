@@ -6,13 +6,13 @@
   <title>Duet Anything</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik+Mono+One&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="stage.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 </head>
 <body data-screen="idle">
-  <!-- Ambient background: GPU-only drifting light blobs + beat ring -->
+  <!-- Paper ground: photocopy grain + beat pulse -->
   <div class="bg" aria-hidden="true">
     <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
     <div class="beat-ring" id="beatRing"></div>
@@ -23,7 +23,7 @@
   <div class="gate" id="gate">
     <button class="gate-btn" id="gateBtn">
       <span class="gate-icon">&#9654;</span>
-      <span>Click to start the show</span>
+      <span>Start the show</span>
     </button>
     <p class="gate-hint">Turns on sound + the beat. Then press <kbd>D</kbd> any time for a demo duet.</p>
   </div>
@@ -83,9 +83,11 @@
         <p class="char-object" id="charObject"></p>
         <p class="char-catch" id="charCatch"></p>
       </div>
+      <p class="fac" id="facLabel">FAC 51 &middot; DUET ANYTHING</p>
     </div>
 
     <div class="right-col">
+      <div class="logo-sm" aria-hidden="true">DUET<br>ANYTHING</div>
       <div class="song-head">
         <span class="badge" id="songGenre"></span>
         <h2 class="song-title" id="songTitle"></h2>
@@ -129,5 +131,7 @@
   <div class="toast" id="toast"></div>
 
   <script type="module" src="stage.js"></script>
+  <script type="module" src="audience-stage.js"></script>
+  <script type="module" src="waking.js"></script>
 </body>
 </html>

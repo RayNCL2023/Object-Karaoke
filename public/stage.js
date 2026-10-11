@@ -376,7 +376,9 @@ const crowd = createCrowd($("crowd"));
 let crowdFor = null, crowdLine = null, crowdLineCheck = 0;
 const isKaraoke = () => session?.mode === "karaoke" || session?.song?.mode === "karaoke" || session?.karaoke === true || document.body.dataset.mode === "karaoke";
 /** Timeline hooks: window.crowd.show(true|false|null = auto), .cheer() for a burst of arms-up. */
-window.crowd = { show: (v) => crowd.show(v), cheer: () => crowd.cheer() };
+window.crowd = { show: (v) => crowd.show(v), cheer: () => crowd.cheer(),
+  // Audience phones (public/audience-stage.js): named members ahead of placeholders, reaction bubbles.
+  addMember: (m) => crowd.addMember(m), removeMember: (id) => crowd.removeMember(id), react: (id, type) => crowd.react(id, type), audienceCount: () => crowd.audienceCount() };
 function crowdTick(now, dt, pulse) {
   if (session?.id && session.id !== crowdFor) { crowdFor = session.id; crowd.setMembers(pickCrowd()); } // reshuffle each song
   if (!session) crowdFor = null;
@@ -389,7 +391,7 @@ function crowdTick(now, dt, pulse) {
   const mood = state === "result" ? ({ celebrate: "cheer", laugh: "laugh", facepalm: "boo" }[charMode.verdict] || null) : null;
   const excite = Math.max(chorus ? 1 : 0, Math.min(1, mouthLvl * 1.4), charMode.listening ? 0.45 : 0);
   const beat = fallbackBpm ? ((now - fallbackStart) / 60000) * fallbackBpm : null;
-  crowd.tick({ now, dt, beat, pulse, excite, mood, visible: state === "result" || (state === "show" && isKaraoke()) });
+  crowd.tick({ now, dt, beat, pulse, excite, mood, visible: state === "result" || (state === "show" && (isKaraoke() || crowd.audienceCount() > 0)) });
 }
 
 // ---------- Render loop: pose springs, mouth, googly eyes, glow, beat ring (transform/opacity only) ----------
@@ -551,6 +553,7 @@ async function startShow(s) {
   el.charCatch.textContent = c.catchphrase ? `"${c.catchphrase}"` : "";
   el.songGenre.textContent = [s.song.genre, s.song.bpm && `${s.song.bpm} bpm`].filter(Boolean).join(" · ");
   el.songTitle.textContent = s.song.title || "Untitled Banger";
+  setFac(s.mode === "battle" || s.battle ? "ROAST BATTLE" : s.mode === "karaoke" ? "KARAOKE" : "DUET");
   el.show.classList.toggle("is-returning", !!s.returning);
   buildLyrics(s.song.lines, c.name || "Object");
   el.rec.classList.remove("live"); el.got.classList.remove("show"); el.judging.classList.remove("on");
@@ -608,10 +611,10 @@ async function youLineInner(i, line, myRun, ms) {
   // 3-2-1 countdown on the beat
   const beatMs = Math.min(700, Math.max(380, 60000 / (session.song.bpm || 100)));
   for (const n of ["3", "2", "1"]) {
-    el.count.textContent = n; el.count.classList.remove("go"); void el.count.offsetWidth; el.count.classList.add("go");
+    bigCount(n);
     await sleep(beatMs); guard(myRun);
   }
-  el.count.textContent = "SING!"; el.count.classList.remove("go"); void el.count.offsetWidth; el.count.classList.add("go");
+  bigCount("SING!");
 
   el.got.classList.remove("show");
   el.rec.classList.add("live");
@@ -663,7 +666,7 @@ function addLyric(who, text, name) {
   el.track.insertAdjacentHTML("beforeend", `<div class="ln ${who === "you" ? "you" : "obj"}" data-i="${i}"><div class="who">${who === "you" ? "&#127908; You said" : esc(name)}</div><div class="txt"><span class="base">${esc(text)}</span><span class="wipe"><span class="wipe-in">${esc(text)}</span></span></div></div>`);
   return i;
 }
-function bigCount(text) { el.count.textContent = text; el.count.classList.remove("go"); void el.count.offsetWidth; el.count.classList.add("go"); }
+function bigCount(text) { el.count.classList.toggle("word", String(text).length > 3); el.count.textContent = text; el.count.classList.remove("go"); void el.count.offsetWidth; el.count.classList.add("go"); }
 
 async function battleRounds(s, myRun, c) {
   const rounds = s.battle?.rounds || 3, youMs = s.battle?.youMs || 12000, name = c.name || "Object";
@@ -673,6 +676,7 @@ async function battleRounds(s, myRun, c) {
   guard(myRun);
   for (let r = 1; r <= rounds; r++) {
     await sleep(300); guard(myRun);
+    window.playSfx?.("scratch"); // ElevenLabs record scratch at each round change (fire-and-forget)
     await freestyleTurn(r, rounds, youMs, myRun);
     // What the user ACTUALLY said (arrives right after speech-to-text, before the comeback is ready)
     setPose("thinking");
@@ -693,10 +697,14 @@ async function battleRounds(s, myRun, c) {
     const ci = addLyric("object", cb.text, name);
     focusLine(ci);
     await objectLine(ci, cb, myRun, c);
+    window.playSfx?.(Math.random() < 0.6 ? "ooooh" : "laugh"); // crowd reacts to the comeback
     guard(myRun);
   }
 }
+function setFac(t) { const f = $("facLabel"); if (f) f.textContent = `FAC 51 · ${t}`; } // zine catalogue label
+const pad2 = (n) => String(n).padStart(2, "0");
 async function freestyleTurn(r, rounds, ms, myRun) {
+  setFac(`ROAST BATTLE · ROUND ${pad2(r)}/${pad2(rounds)}`);
   charMode.listening = true;
   try {
     for (const n of ["3", "2", "1"]) { bigCount(n); await sleep(550); guard(myRun); }
@@ -811,13 +819,14 @@ async function showVerdict(v, myRun) {
   });
   if (myRun !== run) return;
   Beat.sting(score >= 85 ? "airhorn" : score >= 50 ? "applause" : "fail");
+  if (score >= 85) window.playSfx?.("cheer"); else if (score < 50) window.playSfx?.("boo"); // ElevenLabs crowd on the verdict
   if (score >= 50) burstConfetti(score >= 85 ? 260 : 160);
   else burstConfetti(40);
 
   // Roast: type the text while the object speaks it
   typeText(el.roast, v.roast || "", 2800);
   const roastMs = Math.max(2500, (v.roast || "").length * 60);
-  if (v.audio && !session?.mock) { try { await playMp3(v.audio, roastMs); return; } catch {} }
+  if (v.audio && !session?.mock) { try { await playMp3(v.audio, roastMs); if (myRun === run) window.playSfx?.("micdrop"); return; } catch {} }
   if (myRun === run && v.roast) speakFallback(v.roast, roastMs, 3);
 }
 function typeText(node, text, ms) {
@@ -980,11 +989,11 @@ function setModeUi(m) {
   if (!modeBtn) {
     modeBtn = document.createElement("button");
     modeBtn.type = "button";
-    modeBtn.style.cssText = "margin-top:14px;padding:10px 18px;border-radius:999px;border:2px solid var(--accent,#ff5a36);background:rgba(0,0,0,.35);color:#fff;font:700 16px/1.2 inherit;cursor:pointer";
+    modeBtn.className = "mode-btn";
     modeBtn.addEventListener("click", (e) => { e.stopPropagation(); setMode(gameMode === "battle" ? "karaoke" : "battle"); });
     (el.idleCta?.parentElement || document.body).appendChild(modeBtn);
   }
-  modeBtn.innerHTML = gameMode === "battle" ? "&#127908; Mode: <b>ROAST BATTLE</b> · switch to Karaoke (M)" : "&#127925; Mode: <b>KARAOKE</b> · switch to Roast Battle (M)";
+  modeBtn.innerHTML = gameMode === "battle" ? "Mode: <b>ROAST BATTLE</b> · M for Karaoke" : "Mode: <b>KARAOKE</b> · M for Roast Battle";
 }
 async function setMode(m) {
   setModeUi(m);

@@ -107,15 +107,37 @@ export function renderGallery(row, countEl) {
 }
 
 // ---------- Karaoke crowd ----------
-const BUBBLES = { cheer: ["woo!", "get in!", "tune!", "mint!", "go on!", "proper!", "encore!", "buzzin'!"], boo: ["boo!", "ouch", "nah mate", "my ears!", "oof"], laugh: ["haha!", "savage!", "ooooh!", "roasted!"] };
+const BUBBLES = { cheer: ["woo!", "get in!", "tune!", "mint!", "go on!", "proper!", "encore!", "buzzin'!"], boo: ["boo!", "ouch", "nah mate", "my ears!", "oof"], laugh: ["haha!", "savage!", "ooooh!", "roasted!"], fire: ["FIRE!", "scorcher!", "heat!", "too hot!"] };
+/** Audience phone member -> crowd character: their picked placeholder art, their name + colour. */
+function audienceChar(a) {
+  const ph = PLACEHOLDERS.find((p) => p.id === a.avatar) || PLACEHOLDERS[0];
+  return { ...ph, id: a.id, name: a.name, colour: a.colour, audience: true };
+}
 export function createCrowd(host) {
   let members = [], visible = false, nextBubble = 0, forced = null;
-  const S = { setMembers, tick, show: (v) => { forced = v === null || v === undefined ? null : !!v; }, cheer: () => { burst = 1; } };
-  let burst = 0;
+  const S = { setMembers, tick, show: (v) => { forced = v === null || v === undefined ? null : !!v; }, cheer: () => { burst = 1; }, addMember, removeMember, react, audienceCount: () => audience.size };
+  let burst = 0, base = [];
+  const audience = new Map(); // phone members, always in the crowd ahead of placeholders
+  function addMember(a) {
+    if (!a || !a.id) return;
+    audience.set(a.id, audienceChar(a));
+    setMembers(base);
+  }
+  function removeMember(id) { if (audience.delete(id)) setMembers(base); }
+  /** Phone reaction: bubble over that member (or a random one if they're off-screen) + a little energy burst. */
+  function react(id, type) {
+    const m = members.find((x) => x.c.id === id) || members[(Math.random() * members.length) | 0];
+    if (m) bubble(m, type, performance.now());
+    if (type !== "boo") burst = Math.min(1, burst + 0.35);
+  }
   function setMembers(list) {
+    base = list.filter((c) => !c.audience);
     host.innerHTML = "";
-    members = list.slice(0, MAX).map((c, i) => {
-      const n = stickerEl(c);
+    const aud = [...audience.values()];
+    const cap = Math.max(MAX, Math.min(aud.length, 20));
+    members = [...aud, ...base].slice(0, cap).map((c, i) => {
+      const n = stickerEl(c, { name: !!c.audience });
+      if (c.audience) { n.classList.add("cm-aud"); n.style.setProperty("--aud", c.colour); }
       host.appendChild(n);
       return { n, c, d: Math.random() * 0.6, wob: Math.random() * 6.28, arm: 20, armR: 20, px: 0, py: 1, vx: 0, vy: 0, bubbleUntil: 0, i };
     });

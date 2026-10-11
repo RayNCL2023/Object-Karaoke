@@ -1,9 +1,8 @@
 // Duet Anything - phone mic. Snap an object, then sing your lines into the phone when the stage says so.
 const $ = (id) => document.getElementById(id);
 const QUIPS = [
-  "Giving it a brew...", "Asking our Nan...", "Proper waking it up, our kid...", "Putting the kettle on...",
-  "Teaching it Wonderwall...", "Finding its best side...", "Warming up the vocal cords...", "It's buzzin', hang on...",
-  "Getting it a pint...", "Telling it to stop mitherin'...",
+  "CUTTING YOU OUT...", "GIVING IT A VOICE...", "TEACHING IT TO SWEAR (POLITELY)...", "ASKING OUR NAN...",
+  "WARMING UP THE BARS...", "PUTTING THE KETTLE ON...", "TELLING IT TO STOP MITHERIN'...",
 ];
 const DONE_QUIPS = ["Sound!", "Mint!", "Proper!", "Buzzin'!", "Nailed it (maybe)."];
 
@@ -126,7 +125,7 @@ async function onRecordStart(ev) {
   if (ev.id) state.id = ev.id;
   buzz([60, 40, 60]);
   const yl = document.querySelector("#recScreen .yourline");
-  if (yl) yl.textContent = isBattle() ? `FREESTYLE! Roast it back 🎤${ev.round ? ` · Round ${ev.round}` : ""}` : "SING! 🎤";
+  if (yl) yl.textContent = isBattle() ? (ev.round ? `ROUND ${String(ev.round).padStart(2, "0")} · SPIT` : "FREESTYLE") : "SING";
   clearInterval(countdownTimer);
   if (isBattle()) { // big seconds countdown instead of lyrics
     const end = Date.now() + ms;
@@ -149,14 +148,16 @@ async function onRecordStart(ev) {
   rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const stopped = new Promise((r) => (rec.onstop = r));
   rec.start();
+  state.rec = rec; // small Stop button on the mic screen can end the take early
   setTimeout(() => rec.state !== "inactive" && rec.stop(), isBattle() ? ms + 300 : ms + 50); // karaoke: free the mic before the next line starts
   await stopped;
+  state.rec = null;
   stopMeter();
   state.recording = false;
   const blob = new Blob(chunks, { type: rec.mimeType || mime || "audio/webm" });
   const battle = isBattle();
   clearInterval(countdownTimer);
-  if (battle) sent("Bars sent! 🔥", "It's cooking up a comeback... watch the stage.");
+  if (battle) sent("Bars sent!", "It's cooking up a comeback... watch the stage.");
   try {
     const audio = await toBase64(blob);
     const r = await postJson("/api/take", { id: state.id, line: lineIndex, round: lineIndex, audio, mime: blob.type });
@@ -165,6 +166,7 @@ async function onRecordStart(ev) {
     if (battle && state.screen === "sentScreen") $("sentText").textContent = "Couldn't send that one - carry on!";
   }
 }
+$("stopBtn")?.addEventListener("click", () => { if (state.rec && state.rec.state !== "inactive") state.rec.stop(); });
 function sent(title, text) { $("sentTitle").textContent = title; $("sentText").textContent = text; show("sentScreen"); }
 
 function startMeter(stream) {

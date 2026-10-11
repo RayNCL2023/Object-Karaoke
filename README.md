@@ -19,11 +19,13 @@ Built today at Hacktoberfest Hack Day Manchester (11 October 2026), all code wri
 
 Needs Node 18+ and nothing to install.
 
-1. Put your keys in `.env` (never commit it): `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`.
-2. Start memory: `powershell -ExecutionPolicy Bypass -File start-memory.ps1` (NMAFC on http://127.0.0.1:8765).
-3. Start the app: `node server.mjs`, then open http://localhost:5173 on the laptop (the stage).
+1. Clone the repo and run `node server.mjs`.
+2. Open http://localhost:5173 on the laptop. First launch shows a setup screen: paste your Gemini key ([get one](https://aistudio.google.com/apikey)) and ElevenLabs key ([get one](https://elevenlabs.io/app/settings/api-keys)), hit **Test keys**, then **Save & start**. They're saved to `.env` on your laptop (gitignored) and never sent to the browser or phones. Change them later with the small **Keys** link on the stage.
+3. Optional memory: `powershell -ExecutionPolicy Bypass -File start-memory.ps1` (NMAFC on http://127.0.0.1:8765).
 4. Phone: open the link shown on the stage (same Wi-Fi). The mic needs a secure context, so over USB is best:
    `adb reverse tcp:5173 tcp:5173`, then http://localhost:5173/mic.html on the phone.
+
+**The crowd joins too:** the stage shows a 4-letter room code and a QR. Anyone on the same Wi-Fi opens `/join.html`, picks a nickname, face and colour, and appears in the on-stage crowd. They spam Cheer / Fire / Laugh / Boo and vote who won each battle round; the crowd vote moves the final score by up to 10 points.
 
 **No keys, no Wi-Fi, no problem:** run with `MOCK=1` for a full demo with no paid calls (canned character and song).
 
@@ -31,6 +33,16 @@ Needs Node 18+ and nothing to install.
 - Bash: `MOCK=1 node server.mjs`
 
 Optional settings: `PORT` (default 5173), `GEMINI_MODEL` (default `gemma-4-26b-a4b-it`), `NMAFC_URL`, `NMAFC_AGENT`.
+
+## Desktop app
+
+The stage also runs as a desktop app (Electron) for Windows and Mac. Phones still join through the web link, nothing to install on the phone.
+
+1. `npm install` (only needed for the desktop app; the web mode above still needs no packages).
+2. `npm run desktop` opens the stage in its own window. It starts the same server inside the app, picks a free port (5173-5180), and allows the laptop microphone for the laptop-mic fallback. F11 toggles full screen. The menu (press Alt) and the tray icon have **Show phone link** with the mic URL and a QR code. On Windows it also starts NMAFC memory with `start-memory.ps1` if memory isn't already running.
+3. `npm run dist` builds installers into `dist/` (Windows portable + NSIS installer, Mac dmg; the dmg has to be built on a Mac). `npm run dist:win` builds Windows only.
+
+The installed app keeps its `.env`, `cache/` and `certs/` in the app's user-data folder (Windows: `%APPDATA%\duet-anything`, Mac: `~/Library/Application Support/duet-anything`; the app prints the path when it starts), so put your `.env` there. You can point any run at another folder with `DUET_DATA_DIR`.
 
 ## Tracks we entered, and honestly how we fit
 
@@ -48,6 +60,7 @@ Optional settings: `PORT` (default 5173), `GEMINI_MODEL` (default `gemma-4-26b-a
 ## Files
 
 - `server.mjs` - Node server: Gemma 4, ElevenLabs, NMAFC memory, live events to the phone and stage
+- `desktop/` - the Electron desktop app wrapper for the stage (`main.cjs`, phone link window, icon)
 - `public/` - the stage (`index.html`), the phone mic (`mic.html`) and shared helpers (`api.js`)
 - `marketing/` - submission text, pitch script, demo video plan, social posts, deck brief
 
