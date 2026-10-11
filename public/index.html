@@ -184,8 +184,8 @@
       <p class="help-t">Keys</p>
       <ul>
         <li><kbd>B</kbd> roast battle demo (offline)</li>
-        <li><kbd>O</kbd> object vs object demo (offline)</li>
-        <li><kbd>M</kbd> mode: roast battle / karaoke</li>
+        <li class="multi"><kbd>O</kbd> object vs object demo (offline)</li>
+        <li class="multi"><kbd>M</kbd> mode: roast battle / karaoke</li>
         <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> difficulty: mild / spicy / savage</li>
         <li><kbd>Space</kbd> again</li>
         <li><kbd>Esc</kbd> reset everything (phones too)</li>
@@ -212,6 +212,7 @@
   })();
   </script>
 
+  <script>fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) { document.body.classList.toggle("solo", s.solo !== false); }).catch(function () { document.body.classList.add("solo"); });</script>
   <script src="karaoke.js"></script>
   <script type="module" src="stage.js"></script>
   <script type="module" src="audience-stage.js"></script>

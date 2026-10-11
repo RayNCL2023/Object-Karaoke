@@ -146,6 +146,8 @@
   .tip code { background:#fff; border:2px solid #111; padding:0 5px; }
   .hidden { display:none !important; }
   @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
+  .judgeOut { align-self:center; margin-top:6px; padding:10px 16px; background:#fff; color:#111; border:3px solid #111; box-shadow:4px 4px 0 #111; font-weight:700; text-decoration:none; }
+  .judgeOut.big { background:var(--yellow); font-size:20px; }
 </style>
 </head>
 <body>
@@ -185,6 +187,7 @@
     <div class="tip hidden" id="micTip2"></div>
     <button class="mt-test" data-mic-test type="button" style="align-self:center">🎤 Test mic</button>
     <div class="tip hidden" id="wakeTip">Set your screen timeout to 10 min so the phone doesn't sleep mid-battle.</div>
+    <a class="judgeOut" id="judgeOut" href="/join.html">Not rapping? <b>Judge instead &rarr;</b></a>
   </section>
 
   <!-- 3. Record: the whole phone IS the microphone -->

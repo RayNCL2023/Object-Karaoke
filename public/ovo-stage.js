@@ -479,7 +479,7 @@ addEventListener("keydown", (e) => {
     const demo = session?.demo;
     close();
     if (!demo) post("/api/broadcast", { type: "reset", reason: "ovo-stage" }).catch(() => {});
-  } else if ((e.key === "o" || e.key === "O") && !on && document.body.dataset.screen === "idle") {
+  } else if ((e.key === "o" || e.key === "O") && !on && document.body.dataset.screen === "idle" && !document.body.classList.contains("solo")) {
     try { document.getElementById("gate")?.classList.contains("hide") || document.getElementById("gateBtn")?.click(); } catch {}
     battle(demoSession());
   }

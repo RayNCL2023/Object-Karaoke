@@ -79,6 +79,9 @@ async function unlock() {
   el.gate.classList.add("hide");
 }
 el.gateBtn.addEventListener("click", unlock);
+// The Edge app window allows autoplay (--autoplay-policy): unlock straight away, no button. Elsewhere any click / key unlocks.
+try { const probe = new (window.AudioContext || window.webkitAudioContext)(); if (probe.state === "running") { probe.close(); unlock().then(() => el.gateBtn.click()); } else probe.close(); } catch { /* no audio */ }
+["pointerdown", "keydown"].forEach((t) => addEventListener(t, () => { if (!unlocked) el.gateBtn.click(); }, { capture: true }));
 el.gateBtn.addEventListener("click", () => loadSeg().then((m) => m?.preloadSegmenter()), { once: true }); // warm the cut-out model
 
 /** 0..1 how rounded the current sound is (low-heavy = "O", bright = wide). */
@@ -1165,7 +1168,7 @@ addEventListener("keydown", (e) => {
     if (!unlocked) unlock().then(() => startShow(demoBattle())); else if (state === "idle") startShow(demoBattle());
   } else if (["1", "2", "3"].includes(e.key) && state === "idle") {
     setDifficulty(DIFFS[+e.key - 1]);
-  } else if ((e.key === "m" || e.key === "M") && state === "idle") {
+  } else if ((e.key === "m" || e.key === "M") && state === "idle" && !document.body.classList.contains("solo")) {
     setMode(gameMode === "battle" ? "karaoke" : "battle");
   } else if (e.key === "Escape") {
     hardReset();

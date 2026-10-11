@@ -27,8 +27,13 @@ const player = (() => {
 if (player) {
   const tag = document.getElementById("hdrRight");
   if (tag) tag.textContent = `${player.name} · on the mic`;
-  const ping = () => fetch("/api/players/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playerId: player.id, name: player.name, code: player.code }) }).catch(() => {});
-  ping(); setInterval(ping, 20000);
+  // Heartbeat every 10 s. A new server "boot" id = the server restarted, so any battle this phone was in is gone: back to the start.
+  let boot = null;
+  const ping = () => fetch("/api/players/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playerId: player.id, name: player.name, code: player.code }) })
+    .then((r) => r.json()).then((r) => { if (r?.boot && boot && r.boot !== boot && !state.recording) reset(); if (r?.boot) boot = r.boot; }).catch(() => {});
+  ping(); setInterval(ping, 10000);
+  // Leaving the page (closed tab / switched to judging) frees the slot straight away.
+  addEventListener("pagehide", () => { try { navigator.sendBeacon("/api/players/leave", new Blob([JSON.stringify({ playerId: player.id })], { type: "application/json" })); } catch { /* ignore */ } });
 }
 // Stable per-phone id: sent with /api/object, /api/take and mic-unavailable so the server knows which phone is which.
 const CLIENT = (() => {
@@ -220,8 +225,16 @@ function onSongReady(session, mine = false) {
   ensureMic();
   // Mic never passed on this phone: prompt the test before the first turn (if it isn't someone else's battle).
   const notMine = (pv && !mineP) || (player && session.player && session.player !== player.id);
+  markJudgeOut(notMine);
   if (!notMine && !micPassed() && !micTestOpen()) runMicTest(true);
 }
+// Way out to the crowd page (someone who meant to JUDGE but tapped Battle); big + yellow when it is not their battle.
+{
+  const q = new URLSearchParams(location.search);
+  const link = document.getElementById("judgeOut");
+  if (link) link.href = `/join.html?${new URLSearchParams({ code: q.get("code") || "", name: q.get("name") || player?.name || "" })}`;
+}
+function markJudgeOut(notMine) { document.getElementById("judgeOut")?.classList.toggle("big", !!notMine); }
 
 // ---------- TEST MIC (any [data-mic-test] button, auto-prompted on get-ready) ----------
 function runMicTest(auto = false) {

@@ -605,3 +605,37 @@ body[data-screen="result"] .crowd { left: calc(34cqw + 6px); --h: 104px; }
 .idle .join-card { width: 560px; }
 .idle .join-card .phone-url { font-size: 18px; overflow-wrap: normal; word-break: normal; white-space: nowrap; flex: 0 1 auto; }
 .idle .join-card #phoneUrl.short { font-size: 40px; }
+
+/* SOLO_MODE: demo is just YOU vs THE OBJECT - hide the other modes (SOLO_MODE=0 brings them back) */
+body.solo .mode-btn, body.solo .lob-modes, body.solo .help li.multi, body.solo .kp, body.solo [class^="kp-"] { display: none !important; }
+
+/* Verdict fit pass: roast smaller, leaderboard in its own row (never over the roast), clear of the crowd strip */
+.verdict { bottom: 13cqh; grid-template-rows: auto auto auto auto auto; overflow: hidden; }
+.verdict .roast { font: 400 clamp(30px, 2.2cqw, 40px)/1.12 var(--anton); }
+.verdict .board { grid-column: 2; grid-row: 5; align-self: start; }
+.verdict .again { grid-row: 5; align-self: start; }
+.verdict .board li { font-size: 20px; padding: 3px 0; }
+.verdict .board li b { font-size: 26px; }
+body[data-screen="result"] .crowd { --h: clamp(60px, 9cqh, 100px); }
+.verdict .bw { gap: 6px; }
+.verdict .bw span { font-size: 16px; padding: 4px 10px; border-width: 3px; box-shadow: 3px 3px 0 #111; }
+.verdict .bw:has(.why) span.cat { font-size: 15px; }
+.verdict .score { font-size: 150px; }
+
+/* SOLO host controls: mode buttons are hidden, so one tidy row = hint (left) + difficulty (right) */
+body.solo .idle-left::after { top: 640px; height: 92px; }
+body.solo .idle-left::before { top: 627px; }
+body.solo .idle-left .diff-seg { left: auto; right: calc(100% - 1126px); top: 662px; }
+body.solo #idle > .lob > .lob-hint { left: 20px; top: -130px; width: 620px; }
+
+/* Start button never sits on the character: off the idle screen it is a small strip at the bottom centre */
+body:not([data-screen="idle"]) .gate { left: 0; right: 0; top: auto; bottom: 30px; display: flex; justify-content: center; pointer-events: none; }
+body:not([data-screen="idle"]) .gate-btn { pointer-events: auto; font-size: 28px; padding: 8px 20px 8px 10px; }
+body:not([data-screen="idle"]) .gate-hint { display: none; }
+
+/* QR only: no typed link under the room code (Kaif: people just scan) */
+#phoneUrl, #phoneHint { display: none !important; }
+/* ...and during the waking-up animation (still data-screen=idle underneath) */
+body:has(.wk.on:not(.done)) .gate { left: 0; right: 0; top: auto; bottom: 30px; display: flex; justify-content: center; pointer-events: none; z-index: 200; }
+body:has(.wk.on:not(.done)) .gate-btn { pointer-events: auto; font-size: 28px; padding: 8px 20px 8px 10px; }
+body:has(.wk.on:not(.done)) .gate-hint { display: none; }

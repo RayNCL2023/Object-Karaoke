@@ -6,3 +6,6 @@ cache/
 certs/
 dist/
 launcher/bin/
+
+# Edge app-window profile (cookies, cache)
+browser-profile/

@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
-import { startTunnel } from "./lib/tunnel.mjs";
+import { startTunnel, findCloudflared } from "./lib/tunnel.mjs";
 import { createDuet } from "./lib/duet.mjs";
 import { createAudience } from "./lib/audience.mjs";
 import { createSetup } from "./lib/setup.mjs";
@@ -233,7 +233,7 @@ async function objectRoute(req, res) {
     if (!res.headersSent) sendJson(res, code, { error: message });
   };
   let timer;
-  const work = players.isOvo?.() ? ovo.object(req, res) : duet.getMode() === "karaoke" && karaoke.armed() ? karaoke.object(req, res) : players.pvpPair() ? pvp.object(req, res) : duet.routes["POST /api/object"](req, res);
+  const work = SOLO ? duet.routes["POST /api/object"](req, res) : players.isOvo?.() ? ovo.object(req, res) : duet.getMode() === "karaoke" && karaoke.armed() ? karaoke.object(req, res) : players.pvpPair() ? pvp.object(req, res) : duet.routes["POST /api/object"](req, res);
   try {
     await Promise.race([work, new Promise((_, rej) => { timer = setTimeout(() => rej(Object.assign(new Error("Took too long waking it up - snap again"), { timeout: true })), OBJECT_TIMEOUT_MS); })]);
   } catch (e) {
@@ -247,6 +247,8 @@ const HOST_TOKEN = env("HOST_TOKEN") || crypto.randomBytes(16).toString("hex");
 const hostOk = (req) => setup.isLocal(req) || req.headers["x-host-token"] === HOST_TOKEN || new URL(req.url, "http://x").searchParams.get("token") === HOST_TOKEN;
 const HOST_ONLY = /^(POST \/api\/(gemma|speak|sfx|mode|difficulty|match|karaoke\/(pick|start|heckle))|GET \/api\/voices|(GET|POST) \/api\/memory\/.*|(GET|POST) \/api\/setup\/.+)$/;
 
+// SOLO_MODE (default on): demo focuses on YOU vs THE OBJECT. PvP / object vs object / karaoke stay in the code; SOLO_MODE=0 brings them back.
+const SOLO = env("SOLO_MODE", "1") !== "0";
 const routes = {
   ...duet.routes,
   ...players.routes,
@@ -263,6 +265,10 @@ const routes = {
     return ovo.judge(b, req, res);
   },
   ...audience.routes,
+  ...(SOLO ? {
+    "POST /api/mode": async (req, res) => sendJson(res, 200, { mode: "battle" }),
+    "POST /api/match": async (req, res) => players.routes["GET /api/match"](req, res),
+  } : {}),
   ...setup.routes,
   "POST /api/broadcast": async (req, res) => relay(req, res),
   "POST /api/gemma": async (req, res) => sendJson(res, 200, await gemma(await readJson(req))),
@@ -298,7 +304,7 @@ const routes = {
   "GET /api/status": async (req, res) => {
     let memory = false;
     try { await mem("/v1/memories/search", { agent_id: agent(), query: "ping", limit: 1 }, 3000); memory = true; } catch { /* not running */ }
-    sendJson(res, 200, { gemma: !!env("GEMINI_API_KEY"), elevenlabs: !!elevenKey(), memory, phoneUrl: phoneUrl(), micUrl: publicUrl ? `${publicUrl}/mic.html` : httpsReady ? micHttpsUrl() : phoneUrl().replace("/phone.html", "/mic.html"), publicUrl, shortUrl, tunnel: tunnelState, battle: duet.battleCfg?.() || null, ...(setup.isLocal(req) ? { hostToken: HOST_TOKEN } : {}), mock: env("MOCK") === "1", mode: duet.getMode?.() || "battle", difficulty: duet.getDifficulty?.() || "spicy", needsSetup: setup.needsSetup(), roomCode: audience.code, joinUrl: publicUrl ? `${publicUrl}/join.html` : `http://${lanIp()}:${PORT}/join.html`, playUrl: playUrl(), players: players.count() });
+    sendJson(res, 200, { gemma: !!env("GEMINI_API_KEY"), elevenlabs: !!elevenKey(), memory, phoneUrl: phoneUrl(), micUrl: publicUrl ? `${publicUrl}/mic.html` : httpsReady ? micHttpsUrl() : phoneUrl().replace("/phone.html", "/mic.html"), publicUrl, shortUrl, tunnel: tunnelState, battle: duet.battleCfg?.() || null, ...(setup.isLocal(req) ? { hostToken: HOST_TOKEN } : {}), mock: env("MOCK") === "1", solo: SOLO, mode: SOLO ? "battle" : duet.getMode?.() || "battle", difficulty: duet.getDifficulty?.() || "spicy", needsSetup: setup.needsSetup(), roomCode: audience.code, joinUrl: publicUrl ? `${publicUrl}/join.html` : `http://${lanIp()}:${PORT}/join.html`, playUrl: playUrl(), players: players.count() });
   },
 };
 
@@ -415,7 +421,8 @@ http.createServer(safeHandle).listen(PORT, "0.0.0.0", () => {
   if (env("MOCK") === "1") console.log("MOCK=1: canned character + song, silent MP3s, no paid calls");
   console.log(`Keys:  Gemma ${env("GEMINI_API_KEY") ? "on" : "DEMO"} | ElevenLabs ${elevenKey() ? "on" : "DEMO"} | memory at ${memUrl("")}`);
   console.log(`Room:  ${audience.code}${env("ROOM_CODE") ? " (ROOM_CODE)" : ""}`);
-  if (env("TUNNEL") === "1" || process.argv.includes("--tunnel")) {
+  // Public any-network link is ON by default whenever cloudflared is there (however the server was started); TUNNEL=0 turns it off.
+  if (env("TUNNEL") === "1" || process.argv.includes("--tunnel") || (env("TUNNEL") !== "0" && findCloudflared(here))) {
     tunnelState = "starting";
     console.log("Tunnel: starting a free Cloudflare quick tunnel (any Wi-Fi / 4G)...");
     startTunnel({ port: PORT, appDir: here }).then((url) => {
