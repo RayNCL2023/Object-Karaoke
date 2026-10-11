@@ -37,7 +37,7 @@ document.head.appendChild(css);
 // ---------- idle: room code card + Keys corner ----------
 const card = document.createElement("div");
 card.className = "aud-card";
-card.innerHTML = `<div class="aud-qr" id="audQr"></div><div><small>Join the crowd from your phone</small><span class="aud-code" id="audCode">----</span><p class="aud-url" id="audUrl"></p><p class="aud-n" id="audN"></p></div>`;
+card.innerHTML = `<div class="aud-qr" id="audQr"></div><div><small>Scan to play: battle or judge</small><span class="aud-code" id="audCode">----</span><p class="aud-url" id="audUrl"></p><p class="aud-n" id="audN"></p></div>`;
 (document.querySelector(".idle-left") || $("idle") || document.body).appendChild(card);
 if (isLocal) {
   const k = document.createElement("a");
@@ -82,12 +82,14 @@ setInterval(() => { energy = Math.max(0, energy - 0.02); $("audMeter").style.tra
 const BUMP = { cheer: 0.12, fire: 0.16, laugh: 0.1, boo: 0.05 };
 const WORD = { cheer: "cheers", fire: "is on FIRE", laugh: "is crying laughing", boo: "boos" };
 
+let pvpPair = null; // PLAYER vs PLAYER: [p1, p2] (votes are player ids)
 function showTally(ev) {
+  if (pvpPair) ev = { ...ev, player: ev.counts?.[pvpPair[0].id] || 0, object: ev.counts?.[pvpPair[1].id] || 0 };
   const p = ev.player || 0, o = ev.object || 0, t = Math.max(1, p + o);
   $("audTallyTitle").textContent = `Round ${ev.round}: who won?`;
   $("audP").style.flexGrow = p / t; $("audO").style.flexGrow = o / t;
   if (!p && !o) { $("audP").style.flexGrow = 1; $("audO").style.flexGrow = 1; }
-  $("audPL").textContent = `Human ${p}`; $("audOL").textContent = `${o} ${objName}`;
+  $("audPL").textContent = `${pvpPair ? pvpPair[0].name : "Human"} ${p}`; $("audOL").textContent = `${o} ${pvpPair ? pvpPair[1].name : objName}`;
   $("audTally").classList.add("on");
   clearTimeout(tallyTimer); tallyTimer = setTimeout(() => $("audTally").classList.remove("on"), 12000);
 }
@@ -110,11 +112,13 @@ es.onmessage = (m) => {
       $("audFeed").textContent = `${ev.name} ${WORD[ev.reaction] || ""}`;
       break;
     case "song-ready":
+      pvpPair = ev.session?.pvp?.players || null;
       sessionId = ev.session?.id || null; objName = (ev.session?.character?.name || "Object").split(" ")[0];
       $("audTally").classList.remove("on");
       break;
     case "take-received":
-      if (ev.round && (!ev.id || ev.id === sessionId) && members.size) showTally({ round: ev.round, player: 0, object: 0 });
+      if (pvpPair && !ev.voteOpen) break;
+      if (ev.round && (!ev.id || ev.id === sessionId) && members.size) showTally({ round: ev.pvpRound || ev.round, player: 0, object: 0 });
       break;
     case "audience-tally":
       if (!sessionId || ev.id === sessionId) showTally(ev);

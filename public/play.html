@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ece6d6">
+<title>Duet Anything - Play</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { --paper:#ece6d6; --ink:#111; --pink:#ff4f9a; --yellow:#ffd400; --grey:#8a8478; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); font-family:"Space Mono", monospace; overflow-y:auto; }
+  body { display:flex; flex-direction:column; min-height:100vh; min-height:100dvh; overflow-x:clip; }
+  .hazard { height:30px; flex:0 0 auto; background:repeating-linear-gradient(-45deg,#111 0 18px,#ffd400 18px 36px); border-bottom:4px solid var(--ink); }
+  header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px 0; font-size:13px; font-weight:700; text-transform:uppercase; }
+  .logo { font-family:"Rubik Mono One", monospace; font-size:14px; }
+  header a { color:var(--ink); }
+  main { flex:1; display:flex; flex-direction:column; gap:18px; padding:18px 16px calc(24px + env(safe-area-inset-bottom)); max-width:560px; width:100%; margin:0 auto; }
+  h1 { font-family:"Anton", sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(52px, 17vw, 84px); line-height:.95; margin:4px 0 0; padding-top:4px; }
+  h1 .hl { background:var(--pink); padding:2px 6px 0; display:inline-block; line-height:1.02; margin-top:8px; }
+  label { font-size:13px; font-weight:700; text-transform:uppercase; display:block; margin-bottom:6px; }
+  input[type=text] { width:100%; font:700 22px "Space Mono", monospace; padding:12px 14px; border:4px solid var(--ink); background:#fff; color:var(--ink); border-radius:0; text-transform:uppercase; }
+  input[type=text]:focus { outline:none; box-shadow:6px 6px 0 var(--pink); }
+  #code { font-family:"Anton", sans-serif; font-size:40px; letter-spacing:.2em; text-align:center; }
+  .pick { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; margin-top:4px; }
+  .big { display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left; font-family:"Space Mono", monospace; border:5px solid var(--ink); box-shadow:8px 8px 0 var(--ink); padding:14px 16px; cursor:pointer; color:var(--ink); border-radius:0; }
+  .big b { font-family:"Anton", sans-serif; font-weight:400; font-size:clamp(44px, 14vw, 64px); line-height:.95; text-transform:uppercase; }
+  .big span { font-size:13px; font-weight:700; text-transform:uppercase; }
+  .big:active { transform:translate(6px,6px); box-shadow:2px 2px 0 var(--ink); }
+  .big:disabled { opacity:.55; }
+  #battleBtn { background:var(--pink); transform:rotate(-1deg); }
+  #judgeBtn { background:var(--yellow); transform:rotate(1deg); }
+  .err { min-height:1.4em; font-weight:700; color:var(--ink); background:var(--yellow); padding:0 4px; align-self:flex-start; margin:0; }
+  .err:empty { background:none; }
+  .note { font-size:12px; color:var(--grey); text-transform:uppercase; font-weight:700; margin:0; }
+</style>
+</head>
+<body>
+  <div class="hazard"></div>
+  <header><span class="logo">DUET ANYTHING</span><a href="/">Home</a></header>
+  <main>
+    <h1>You're<br><span class="hl">in.</span></h1>
+    <div><label for="code">Room code (on the big screen)</label><input id="code" type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="MANC"></div>
+    <div><label for="name">Your name</label><input id="name" type="text" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="OUR KID"></div>
+    <p class="err" id="err"></p>
+    <div class="pick">
+      <button class="big" id="battleBtn" type="button"><b>Battle</b><span>Grab the mic &amp; rap. Max 8 players.</span></button>
+      <button class="big" id="judgeBtn" type="button"><b>Judge</b><span>Join the crowd, react &amp; vote who won</span></button>
+    </div>
+    <p class="note" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="mt-test" data-mic-test type="button">🎤 Test mic</button><span data-mic-chip></span></p>
+    <p class="note">Battle opens a secure mic page. First time: tap Advanced &rarr; Proceed.</p>
+  </main>
+  <script type="module" src="play.js"></script>
+</body>
+</html>

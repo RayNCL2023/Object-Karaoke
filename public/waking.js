@@ -34,6 +34,21 @@ const photo = q(".wk-photo"); photo.onerror = () => photo.removeAttribute("src")
 const lineEl = q(".wk-line"), fill = q(".wk-fill"), crowdEl = q(".wk-crowd");
 
 let on = false, lineTimer = 0, typeTimer = 0, li = 0;
+// "Under the hood" lines from the server (object-seen / memory-hits / voice-designing) jump ahead of the jokes.
+let real = [], realUntil = 0;
+function pump() {
+  clearTimeout(lineTimer);
+  if (!on) return;
+  const isReal = real.length > 0;
+  if (isReal) typeLine(real.shift()); else { li = (li + 1) % LINES.length; typeLine(LINES[li]); }
+  realUntil = isReal ? performance.now() + 2000 : 0;
+  lineTimer = setTimeout(pump, isReal ? 2400 : 2600);
+}
+function say(text) {
+  if (!on) return;
+  real.push(text);
+  if (performance.now() >= realUntil) pump();
+}
 function typeLine(text) {
   clearInterval(typeTimer);
   let n = 0;
@@ -49,9 +64,10 @@ function start(src) {
   void root.offsetWidth;
   root.classList.add("on", "go");
   requestAnimationFrame(() => { fill.style.transition = "transform 15s cubic-bezier(.12,.62,.28,1)"; fill.style.transform = "translateX(-10%)"; });
+  real = []; realUntil = 0;
   typeLine(LINES[0]);
-  clearInterval(lineTimer);
-  lineTimer = setInterval(() => { li = (li + 1) % LINES.length; typeLine(LINES[li]); }, 2600);
+  clearTimeout(lineTimer);
+  lineTimer = setTimeout(pump, 2600);
   const n = window.crowd?.audienceCount?.() || 0;
   crowdEl.textContent = n ? `${n} in the crowd · ooooh…` : "";
   if (n) { try { window.crowd?.cheer?.(); window.playSfx?.("ooooh"); } catch { /* decoration */ } }
@@ -59,7 +75,7 @@ function start(src) {
 function finish(fast) {
   if (!on) return;
   on = false;
-  clearInterval(lineTimer); clearInterval(typeTimer);
+  clearTimeout(lineTimer); clearInterval(typeTimer); real = [];
   fill.style.transition = fast ? "none" : "transform .35s cubic-bezier(.22,1,.36,1)";
   fill.style.transform = "translateX(0)";
   if (!fast) lineEl.textContent = "IT'S ALIVE!";
@@ -74,4 +90,7 @@ es.onmessage = (e) => {
   if (ev.type === "photo-received" && document.body.dataset.screen === "idle") start(ev.photo);
   else if (ev.type === "song-ready") finish(!!(ev.session || ev).returning);
   else if (ev.type === "error" || ev.type === "reset") finish(true);
+  else if (ev.type === "object-seen" && ev.object) say(`GEMMA 4 SEES: ${String(ev.object).toUpperCase().slice(0, 40)}`);
+  else if (ev.type === "memory-hits") say(ev.known || ev.count > 0 ? `OPENLOFT MEMORY: ${ev.count || 1} HIT${(ev.count || 1) === 1 ? "" : "S"}` : "OPENLOFT MEMORY: NEW FACE");
+  else if (ev.type === "voice-designing") say("ELEVENLABS: DESIGNING A NEW VOICE");
 };

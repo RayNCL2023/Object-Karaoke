@@ -226,7 +226,7 @@ export async function startBeat({ genre, bpm, key } = {}) {
   tr.swing = cfg.swing || 0;
   tr.swingSubdivision = '16n';
   G.beatBus.volume.cancelScheduledValues(Tn.now());
-  G.beatBus.volume.value = state.ducked ? -10 : 0;
+  G.beatBus.volume.value = state.ducked ? DUCK_DB : 0;
 
   state.step = 0;
   state.kicks = [];
@@ -311,7 +311,7 @@ export function setDuck(on) {
   if (!G || !window.Tone) return;
   const Tn = T();
   G.beatBus.volume.cancelScheduledValues(Tn.now());
-  G.beatBus.volume.rampTo(on ? -10 : 0, on ? 0.12 : 0.4);
+  G.beatBus.volume.rampTo(on ? DUCK_DB : 0, on ? 0.12 : 0.4);
 }
 
 // ---------------------------------------------------------------- stings
@@ -428,3 +428,20 @@ export async function playSting(name) {
   }
   return 0;
 }
+
+
+// ---- beat-locked vocals: the stage starts object audio on the next bar downbeat (4/4) ----
+const DUCK_DB = -6; // light duck: the object raps OVER the beat, not over silence
+export function isBeatRunning() { return !!state.running; }
+export function getBpm() { try { return state.running ? transport().bpm.value : 0; } catch { return 0; } }
+/** ms until the next bar downbeat (0 if the beat isn't running). minMs: skip a downbeat that is too close. */
+export function msToNextBar(minMs = 60) {
+  if (!state.running || !window.Tone) return 0;
+  try {
+    const tr = transport(), bar = 240 / tr.bpm.value;
+    let rem = bar - (Math.max(0, tr.seconds) % bar);
+    if (rem * 1000 < minMs) rem += bar;
+    return rem * 1000 + (Number(T().getContext().lookAhead) || 0) * 1000; // tr.seconds runs lookAhead early
+  } catch { return 0; }
+}
+export function onNextBar(cb, minMs) { const ms = msToNextBar(minMs); return setTimeout(cb, ms); }

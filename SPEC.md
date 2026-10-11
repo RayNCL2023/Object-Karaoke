@@ -14,7 +14,9 @@ Tracks (all 8): Gemma 4 · Open-Source AI · ElevenLabs · OpenLoft (NMAFC memor
 - Tone: cheeky, friendly Manchester roasting ("our kid", "mint", "proper", "buzzin'", "sound", "our Nan"), never nasty, nothing offensive about real people.
 
 ## Screens
-- **Stage** `/` (laptop / projector): `public/index.html`, `public/stage.js`, `public/stage.css`.
+- **Landing** `/` (`public/home.html`): two big choices, HOST (→ `/stage`) or PLAYER (→ `/play`). No keys yet + opened on localhost → setup page.
+- **Stage** `/stage` (laptop / projector): `public/index.html`, `public/stage.js`, `public/stage.css`; multi-player lobby/PvP overlay in `public/pvp-stage.js`. The launcher opens `/stage`.
+- **Play** `/play` (`public/play.html` + `play.js`, phone, plain http): room code (prefilled from the QR `?code=`) + name, then **BATTLE** (joins the player lobby, goes to the HTTPS `micUrl` `/mic.html?code=&name=&pid=`) or **JUDGE** (→ `/join.html?code=&name=`). The stage's one QR points at `/play?code=XXXX`.
 - **Mic** `/mic.html` (phone): `public/mic.html`, `public/mic.js`.
 - Existing: `public/api.js` (helpers; may be extended), `public/test.html` (feature test page; leave alone), `public/phone.html` (old pads; leave alone).
 
@@ -54,6 +56,10 @@ All JSON unless noted. `session` objects are kept in memory on the server (Map b
 
 `POST /api/judge` body `{ id }` → `{ score, roast, audio, best, worst, categories?, mode }` — battle: Gemma judges ONLY the user's transcripts vs the object's lines: `categories { wit, rhymes, comebacks, confidence }` 0–10, score 0–100, ≤ 2-sentence roast quoting their best/worst line, `best`/`worst` verbatim; karaoke: from line accuracy. Roast spoken via ElevenLabs (≤ 160 chars); NMAFC remembers the battle (winner, best line). Broadcast `verdict`.
 
+**Players + matches** (`lib/players.mjs`, `lib/pvp.mjs`): `POST /api/players/join {code, name, playerId?}` → `{player:{id,name,colour}}` (max 8) · `POST /api/players/ping` (mic page heartbeat, same body; players silent for 3 min drop) · `POST /api/players/leave {playerId}` · `GET /api/players` → `{players, match, max, code}` · `POST /api/match {type:"object", current?} | {type:"pvp", players:[id1,id2]}`. Broadcasts `players {players, match}`.
+- VS THE OBJECT: the normal battle, the host picks who's up (default first in the queue, rotates after each verdict). The server tags `song-ready.session.player/playerName` and every `record-start` with `player`, `playerName`; `mic.js` ignores record-starts for another player (no `pid` = old single-phone flow, records everything).
+- PLAYER vs PLAYER (match type pvp with 2 players): `/api/object` builds the same character (now the MC) + a PvP intro naming both players; session has `pvp: { players:[p1,p2], roundsEach: 3 }`, `battle.rounds = 6` (turns alternate P1, P2). `/api/take` → `{round, player, playerName, pvpRound, voteOpen, transcript, comeback}` (comeback = MC one-liner ≤ 120 chars, none on turn 6). Crowd votes per pvpRound with `value: <player id>`. `/api/judge` → usual fields (winner's score/categories) + `pvp: { winner, winnerName, players:[{id,name,score,categories,roast,best,crowd,winner}] }`, crowd ±10 per player. Uses `session.difficulty`.
+
 `GET /api/leaderboard` → `[{ name, object, score, title, at }]` (top 10, saved in `cache/leaderboard.json`).
 
 `POST /api/broadcast` (alias of existing `/api/phone`) body = any event; `GET /api/events` = Server-Sent Events stream (exists).
@@ -63,3 +69,12 @@ All JSON unless noted. `session` objects are kept in memory on the server (Map b
 
 ## Look (Best UI)
 Dark stage, one bold accent per character (`character.colour`), huge readable lyrics (current line bright, next dim, sung lines fade), smooth GPU-only animations (transform/opacity, eased), the object photo as a circular character with a mouth and blinking eyes overlay, beat-synced bounce, confetti on the score. Phone screen: one giant button at a time, high contrast, vibration feedback.
+
+## Server additions (15:xx, server bot)
+- `POST /api/judge` accepts `{ id, waitVotesMs }` (max 10000): waits that long for the crowd's last votes, then closes voting for the session. Votes after the verdict / close, for unknown sessions or for rounds beyond `battle.rounds` are rejected (409 / 404 / 400). `POST /api/audience/close { id, round? }` closes voting early (broadcasts `votes-closed`).
+- Failed or timed-out (90 s) `/api/object` broadcasts `error {stage:"object", message}` then `reset {reason:"object-failed"}` and returns JSON 500/504.
+- `/api/object` and `/api/take` carry `client` (mic.js id). The snapping phone owns the session: takes from another client (or without `client` once an owner is set) get 403, except from localhost (laptop mic). `record-start` gets `client` added when no player is targeted. PvP: a take whose `player` isn't the turn player gets 403.
+- Host-only (localhost or header `x-host-token: <hostToken>` from `/api/status` on localhost): `/api/gemma`, `/api/speak`, `/api/sfx`, `/api/voices`, `/api/memory/*`, `/api/setup/*`, `POST /api/mode`, `POST /api/difficulty`, `POST /api/match`, and broadcasting `{type:"reset"}`.
+- `/api/status` adds `publicUrl`, `tunnel` (off|starting|on|failed), `battle {rounds, youMs}`, `hostToken` (localhost only); `micUrl` / `joinUrl` / `playUrl` use the tunnel URL when it's up. Event `public-url {publicUrl}` when the tunnel comes up.
+- `GET /api/poll?since=SEQ&wait=MS` → `{ seq, events }` long-poll (up to 25 s). Use it instead of SSE on the public trycloudflare link: the quick tunnel buffers streamed responses, so SSE events arrive late or never there (SSE is still fine on localhost / LAN).
+- Battle length from `.env`: `BATTLE_ROUNDS` (2), `BATTLE_TURN_MS` (8000). Room code: `ROOM_CODE` or persisted `cache/room-code.txt`.

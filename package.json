@@ -5,36 +5,16 @@
   "license": "MIT",
   "author": "Kaif Nadeem and Debanjan Ray",
   "type": "module",
-  "main": "desktop/main.cjs",
+  "main": "server.mjs",
   "scripts": {
     "start": "node server.mjs",
-    "desktop": "electron desktop/main.cjs",
-    "dist": "electron-builder --win portable nsis --mac dmg",
-    "dist:win": "electron-builder --win portable nsis",
-    "dist:dir": "electron-builder --dir"
+    "app": "node launcher/launch.mjs",
+    "build:exe": "node launcher/build-exe.mjs",
+    "tunnel": "node server.mjs --tunnel",
+    "reset-data": "node scripts/reset-data.mjs"
   },
   "devDependencies": {
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8"
-  },
-  "build": {
-    "appId": "uk.co.duetanything.app",
-    "productName": "Duet Anything",
-    "directories": { "output": "dist" },
-    "files": [
-      "server.mjs",
-      "lib/**/*",
-      "public/**/*",
-      "desktop/**/*",
-      "start-memory.ps1",
-      "LICENSE",
-      "README.md",
-      "!cache/**",
-      "!certs/**",
-      "!.env"
-    ],
-    "win": { "target": ["portable", "nsis"], "icon": "desktop/icon.png", "signAndEditExecutable": false },
-    "mac": { "target": "dmg", "icon": "desktop/icon.png", "category": "public.app-category.music" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "esbuild": "^0.28.2",
+    "postject": "^1.0.0-alpha.6"
   }
 }

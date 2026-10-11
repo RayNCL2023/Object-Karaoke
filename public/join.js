@@ -1,5 +1,6 @@
 // Duet Anything - audience phone: join the crowd with the room code, react during the show, vote on battle rounds.
 import { PLACEHOLDERS } from "./placeholders.js";
+import { listen as listenEvents } from "./events.js";
 
 const $ = (id) => document.getElementById(id);
 const COLOURS = ["#ff4f9a", "#ffd400", "#3b6fe0", "#2f8f6a", "#ff7a1a", "#8a5cff", "#e23b4e", "#111111"];
@@ -56,6 +57,7 @@ function enterCrowd() {
   $("roomTag").textContent = `ROOM ${me.code}`;
   show("crowdScreen");
   buzz([20, 40, 20]);
+  syncState();
 }
 
 $("leaveBtn").addEventListener("click", async () => {
@@ -87,7 +89,13 @@ function openVote(round) {
   if (!session) return;
   voteRound = round;
   $("voteTitle").textContent = `Round ${round}: who won?`;
-  $("voteObject").textContent = session.name || "The object";
+  if (session.pvp) { // PLAYER vs PLAYER: vote for one of the two players (value = player id)
+    [["votePlayer", 0], ["voteObject", 1]].forEach(([id, i]) => { $(id).dataset.v = session.pvp[i].id; $(id).textContent = session.pvp[i].name; });
+  } else {
+    $("votePlayer").dataset.v = "player"; $("votePlayer").textContent = "The human";
+    $("voteObject").dataset.v = "object";
+  }
+  if (!session.pvp) $("voteObject").textContent = session.name || "The object";
   $("voteTally").textContent = "";
   for (const b of $("vote").querySelectorAll("button")) b.classList.toggle("on", myVotes[`${session.id}|${round}`] === b.dataset.v);
   $("vote").classList.add("show");
@@ -105,33 +113,50 @@ $("vote").addEventListener("click", async (e) => {
 
 // ---------- show phase from the server's event stream ----------
 function phase(title, sub) { $("phaseTitle").textContent = title; $("phaseSub").textContent = sub || ""; }
+// Late / reloaded judges: catch up with the show (and an open vote) instead of waiting for the next event.
+async function syncState() {
+  if (!me.audienceId) return;
+  try {
+    const res = await fetch("/api/audience/state", { cache: "no-store" });
+    if (!res.ok) return;
+    const st = await res.json();
+    if (!st.session) { session = null; voteRound = 0; $("vote").classList.remove("show"); phase("Waiting for a battle", "Someone's snapping an object..."); return; }
+    const s = st.session;
+    session = { id: s.id, name: s.name || "The object", battle: !!s.battle, pvp: s.pvp || null };
+    if (st.phase === "verdict") phase("The judges have spoken", "Watch the big screen");
+    else if (st.phase === "record") phase(st.playerName ? `${st.playerName} on the mic!` : st.round ? `Round ${st.round}: freestyle!` : "Their turn!", "Make some noise");
+    else if (session.pvp) phase(`${session.pvp[0].name} vs ${session.pvp[1].name}`, "You judge!");
+    else phase(`${session.name} is up!`, session.battle ? "roast battle - you judge" : "karaoke time - hype them up");
+    if (st.voteOpen && st.voteRound) openVote(st.voteRound); else $("vote").classList.remove("show");
+  } catch { /* offline: the event stream will catch us up */ }
+}
 function listen() {
-  const es = new EventSource("/api/events");
-  es.onopen = () => $("dot").classList.add("on");
-  es.onerror = () => $("dot").classList.remove("on");
-  es.onmessage = (m) => {
-    let ev; try { ev = JSON.parse(m.data); } catch { return; }
+  listenEvents((ev) => {
     switch (ev.type) {
       case "photo-received": phase("Something's waking up", "Hold tight..."); break;
       case "song-ready": {
         const s = ev.session || {};
-        session = { id: s.id, name: s.character?.name || "The object", battle: s.mode === "battle" || !!s.battle };
+        session = { id: s.id, name: s.character?.name || "The object", battle: s.mode === "battle" || !!s.battle, pvp: s.pvp?.players || null };
         $("vote").classList.remove("show");
+        if (session.pvp) { phase(`${session.pvp[0].name} vs ${session.pvp[1].name}`, `${session.name} the ${s.object || "object"} is hosting. You judge!`); break; }
         phase(`${session.name} is up!`, session.battle ? `the ${s.object || "object"} wants a roast battle` : "karaoke time - hype them up");
         break;
       }
       case "record-start":
         $("vote").classList.remove("show");
-        phase(ev.round ? `Round ${ev.round}: freestyle!` : "Their turn to sing!", "Make some noise");
+        phase(ev.playerName ? `${ev.playerName} on the mic!` : ev.round ? `Round ${ev.round}: freestyle!` : "Their turn to sing!", "Make some noise");
         break;
       case "take-heard": if (session?.battle) phase(`Round ${ev.round}`, `They said: "${String(ev.transcript || "...").slice(0, 80)}"`); break;
       case "take-received":
+        if (session?.pvp && ev.round) { phase(`${ev.playerName || "They"} said it`, ev.comeback ? "The MC reacts..." : "Off to the judges"); if (ev.voteOpen) openVote(ev.pvpRound); break; }
         if (session?.battle && ev.round) { phase(`Round ${ev.round}`, ev.comeback ? "Comeback incoming..." : "Off to the judges"); openVote(ev.round); }
         break;
       case "audience-tally":
+        if (session?.pvp && ev.id === session.id && ev.round === voteRound) { const c = ev.counts || {}; $("voteTally").textContent = `${session.pvp[0].name} ${c[session.pvp[0].id] || 0} - ${c[session.pvp[1].id] || 0} ${session.pvp[1].name}`; break; }
         if (session && ev.id === session.id && ev.round === voteRound) $("voteTally").textContent = `Human ${ev.player} - ${ev.object} ${session.name}`;
         break;
       case "verdict":
+        if (ev.pvp) { phase(`${ev.pvp.winnerName} wins!`, ev.pvp.players.map((x) => `${x.name} ${x.score}`).join(" · ")); setTimeout(() => $("vote").classList.remove("show"), 4000); break; }
         phase(`Score: ${ev.score}/100`, ev.crowd ? `crowd vote ${ev.crowd.bonus >= 0 ? "+" : ""}${ev.crowd.bonus}` : "the judges have spoken");
         setTimeout(() => $("vote").classList.remove("show"), 4000);
         break;
@@ -140,13 +165,13 @@ function listen() {
         phase("Waiting for a battle", "Someone's snapping an object...");
         break;
     }
-  };
+  }, { onOpen: () => { $("dot").classList.add("on"); syncState(); }, onError: () => $("dot").classList.remove("on") });
 }
 
 // ---------- boot ----------
 const qsCode = new URLSearchParams(location.search).get("code");
 $("code").value = (qsCode || me.code || "").toUpperCase().slice(0, 4);
-$("name").value = me.name || "";
+$("name").value = new URLSearchParams(location.search).get("name") || me.name || ""; // prefilled from /play
 renderPickers();
 listen();
 if (me.audienceId && me.name && me.code && (!qsCode || qsCode.toUpperCase() === me.code)) join(true);

@@ -5,3 +5,4 @@ cache/
 .claude/
 certs/
 dist/
+launcher/bin/

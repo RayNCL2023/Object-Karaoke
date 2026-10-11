@@ -35,7 +35,7 @@ $("save").addEventListener("click", async () => {
     $("gemini").value = ""; $("elevenlabs").value = "";
     if (r.needsSetup) { $("msg").textContent = `Saved. Still missing: ${!r.gemini ? "Gemini" : ""}${!r.gemini && !r.elevenlabs ? " and " : ""}${!r.elevenlabs ? "ElevenLabs" : ""}.`; busy(false); return; }
     $("msg").textContent = "Saved. Starting the show...";
-    setTimeout(() => location.replace("/"), 700);
+    setTimeout(() => location.replace("/stage"), 700);
   } catch (e) { $("msg").textContent = e.message; busy(false); }
 });
 
@@ -43,5 +43,5 @@ $("save").addEventListener("click", async () => {
 fetch("/api/setup").then((r) => r.json()).then((s) => {
   if (!s.local) { $("blocked").style.display = "block"; busy(true); }
   for (const f of ["gemini", "elevenlabs"]) if (s[f]) $(f).placeholder = "already set - leave empty to keep it";
-  if (!s.needsSetup && !force) location.replace("/");
+  if (!s.needsSetup && !force) location.replace("/stage");
 }).catch(() => {});

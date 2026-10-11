@@ -10,8 +10,40 @@
   <link rel="stylesheet" href="stage.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script>
+  // One shared /api/events stream for every stage script (stage, audience, pvp, waking each open one otherwise):
+  // browsers allow only 6 connections per host, so 4+ SSE streams + audio left fetches (judge, broadcast) stuck pending.
+  (function () {
+    var Real = window.EventSource; if (!Real) return;
+    var shared = null, subs = [];
+    function Shared(url, opts) {
+      if (String(url).indexOf("/api/events") < 0) return new Real(url, opts);
+      var self = this; self.onmessage = self.onerror = self.onopen = null; self.readyState = 0; self._l = {};
+      if (!shared) {
+        shared = new Real(url);
+        shared.onmessage = function (e) { subs.slice().forEach(function (s) { s._emit("message", e); }); };
+        shared.onerror = function (e) { subs.slice().forEach(function (s) { s._emit("error", e); }); };
+        shared.onopen = function (e) { subs.slice().forEach(function (s) { s.readyState = 1; s._emit("open", e); }); };
+      }
+      subs.push(self);
+      if (shared.readyState === 1) { self.readyState = 1; setTimeout(function () { self._emit("open", {}); }); }
+    }
+    Shared.prototype._emit = function (t, e) {
+      var f = this["on" + t], me = this;
+      if (f) { try { f.call(me, e); } catch (x) { console.error(x); } }
+      (this._l[t] || []).forEach(function (g) { try { g.call(me, e); } catch (x) { console.error(x); } });
+    };
+    Shared.prototype.addEventListener = function (t, f) { (this._l[t] = this._l[t] || []).push(f); };
+    Shared.prototype.removeEventListener = function (t, f) { this._l[t] = (this._l[t] || []).filter(function (g) { return g !== f; }); };
+    Shared.prototype.close = function () { var i = subs.indexOf(this); if (i >= 0) subs.splice(i, 1); this.readyState = 2; };
+    Shared.CONNECTING = 0; Shared.OPEN = 1; Shared.CLOSED = 2;
+    window.EventSource = Shared;
+  })();
+  </script>
 </head>
 <body data-screen="idle">
+  <!-- Fixed 1920x1080 design canvas, scaled to fit any window (letterboxed in paper) -->
+  <div id="canvas">
   <!-- Paper ground: photocopy grain + beat pulse -->
   <div class="bg" aria-hidden="true">
     <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
@@ -25,24 +57,24 @@
       <span class="gate-icon">&#9654;</span>
       <span>Start the show</span>
     </button>
-    <p class="gate-hint">Turns on sound + the beat. Then press <kbd>D</kbd> any time for a demo duet.</p>
+    <p class="gate-hint">Turns on sound + the beat. Press <kbd>B</kbd> any time for the roast battle demo &middot; <kbd>H</kbd> for keys.</p>
   </div>
 
   <!-- IDLE -->
   <section class="screen idle" id="idle">
     <div class="idle-left">
-      <p class="eyebrow">Hack Day Manchester &middot; live karaoke</p>
+      <p class="eyebrow">Hack Day Manchester &middot; live roast battle</p>
       <h1 class="title"><span class="t1">Duet</span><span class="t2">Anything</span></h1>
-      <p class="tagline">Snap any object. It comes alive, sings a duet with you, then roasts you proper.</p>
+      <p class="tagline">Snap any object. It wakes up as a cheeky Manc rapper and roast-battles you, bar for bar. The crowd votes on their phones. (Karaoke duet is the side mode: <kbd>M</kbd>.)</p>
       <div class="cta" id="idleCta"><span class="dot"></span><span id="idleCtaText">Snap anything to start</span></div>
       <ol class="mini-board" id="idleBoard"></ol>
     </div>
-    <div class="phone-card">
+    <div class="join-card" id="joinCard">
+      <p class="join-head">Scan to play <span>battle or judge</span></p>
       <div class="qr" id="qr"></div>
-      <p class="phone-label">Open on your phone</p>
-      <p class="phone-url" id="phoneUrl">checking&hellip;</p>
+      <div class="join-row"><div><p class="join-code-l">Room code</p><p class="join-code" id="joinCode">----</p></div><p class="phone-url" id="phoneUrl">checking&hellip;</p></div>
       <p class="phone-hint" id="phoneHint"></p>
-      <p class="phone-usb">USB: <b>localhost:5173/mic.html</b></p>
+      <p class="join-mic" id="joinMic"></p>
     </div>
     <div class="roster" id="roster">
       <p class="roster-title">Characters<span id="rosterCount"></span></p>
@@ -98,6 +130,7 @@
 
       <div class="verdict" id="verdict">
         <p class="verdict-label">The verdict</p>
+        <p class="winner" id="winner"></p>
         <div class="score"><span id="scoreNum">0</span><small>/100</small></div>
         <p class="roast" id="roast"></p>
         <div class="bw" id="bw"></div>
@@ -109,7 +142,7 @@
       </div>
     </div>
 
-    <!-- YOUR LINE overlay -->
+    <!-- YOUR TURN overlay -->
     <div class="rec" id="rec">
       <div class="count" id="count"></div>
       <div class="rec-live">
@@ -117,21 +150,70 @@
           <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
           <svg viewBox="0 0 24 24" width="64" height="64"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg>
         </div>
-        <p class="rec-title">YOUR LINE</p>
+        <p class="rec-title" id="recTitle">YOUR TURN</p>
         <p class="rec-state" id="recState">Listening on your phone&hellip;</p>
       </div>
       <div class="got" id="got"></div>
     </div>
 
+    <div class="turn-clock" id="turnClock" aria-live="off"></div>
+    <div class="cooking" id="cooking"><span class="spinner"></span><p>Cooking a comeback&hellip;</p></div>
+    <div class="vclose" id="vclose"><p class="vclose-t">Vote closing</p><p class="vclose-n" id="vcloseN">3</p><p class="vclose-s">Get your votes in on your phones!</p></div>
     <div class="judging" id="judging"><div class="spinner"></div><p>Judging you&hellip;</p></div>
     <div class="crowd" id="crowd" aria-hidden="true"></div>
   </section>
 
+  <!-- OPENLOFT memory found (returning object) -->
+  <div class="memcard" id="memcard" aria-live="polite">
+    <div class="memcard-in">
+      <p class="memcard-t">OpenLoft memory found</p>
+      <div class="memcard-row">
+        <img class="memcard-photo" id="memPhoto" alt="">
+        <div class="memcard-facts">
+          <p class="memcard-name" id="memName"></p>
+          <p id="memWhen"></p>
+          <p id="memScore"></p>
+          <p class="memcard-best" id="memBest"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- H: keys help -->
+  <div class="help" id="help">
+    <div class="help-in">
+      <p class="help-t">Keys</p>
+      <ul>
+        <li><kbd>B</kbd> roast battle demo (offline)</li>
+        <li><kbd>M</kbd> mode: roast battle / karaoke</li>
+        <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> difficulty: mild / spicy / savage</li>
+        <li><kbd>Space</kbd> again</li>
+        <li><kbd>Esc</kbd> reset everything (phones too)</li>
+        <li><kbd>N</kbd> next player</li>
+        <li><kbd>Q</kbd> show the single-phone mic link</li>
+        <li><kbd>H</kbd> close this</li>
+      </ul>
+    </div>
+  </div>
   <canvas id="confetti" aria-hidden="true"></canvas>
   <div class="toast" id="toast"></div>
+  </div>
+  <script>
+  (function () {
+    var c = document.getElementById("canvas");
+    function fit() {
+      var k = Math.min(innerWidth / 1920, innerHeight / 1080);
+      c.style.transform = "translate(" + ((innerWidth - 1920 * k) / 2).toFixed(1) + "px," + ((innerHeight - 1080 * k) / 2).toFixed(1) + "px) scale(" + k.toFixed(5) + ")";
+      window.stageScale = k;
+    }
+    fit(); addEventListener("resize", fit);
+    // Overlays other scripts append to <body> (audience HUD, waking, keys) move into the scaled canvas
+    new MutationObserver(function (ms) { ms.forEach(function (m) { m.addedNodes.forEach(function (n) { if (n.nodeType === 1 && n !== c && n.tagName !== "SCRIPT" && n.tagName !== "STYLE" && n.tagName !== "LINK") c.appendChild(n); }); }); }).observe(document.body, { childList: true });
+  })();
+  </script>
 
   <script type="module" src="stage.js"></script>
   <script type="module" src="audience-stage.js"></script>
+  <script type="module" src="pvp-stage.js"></script>
   <script type="module" src="waking.js"></script>
 </body>
 </html>

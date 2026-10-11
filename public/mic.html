@@ -14,8 +14,8 @@
     --anton:"Anton", Impact, "Arial Narrow", sans-serif; --mono:"Space Mono", "Courier New", monospace;
     --hazard:repeating-linear-gradient(-45deg, #111 0 18px, #ffd400 18px 36px); }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { margin:0; height:100%; background:var(--paper); color:var(--ink); font-family:var(--mono); overflow:hidden; }
-  body { display:flex; flex-direction:column; position:relative; }
+  html,body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); font-family:var(--mono); overflow-x:clip; }
+  body { display:flex; flex-direction:column; position:relative; min-height:100vh; min-height:100dvh; height:100dvh; padding-top:env(safe-area-inset-top); padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right); }
   body::before { content:""; flex:0 0 34px; background:var(--hazard); border-bottom:4px solid #111; }
   body::after { content:""; position:fixed; inset:0; pointer-events:none; opacity:.2; mix-blend-mode:multiply;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.07 0 0 0 0 0.07 0 0 0 0 0.07 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -28,9 +28,14 @@
   main { flex:1; position:relative; }
   .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
     padding:20px 24px calc(24px + env(safe-area-inset-bottom)); text-align:center; gap:22px;
+    justify-content:flex-start; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
     opacity:0; transform:translateY(16px); pointer-events:none;
     transition:opacity .3s ease, transform .4s cubic-bezier(.2,.8,.2,1); }
   .screen.show { opacity:1; transform:none; pointer-events:auto; }
+  /* centred when it fits, scrolls from the top when it doesn't (no "safe center" trap on older phones) */
+  .screen:not(.micScreen):not(#readyScreen) > :first-child { margin-top:auto; }
+  .screen:not(.micScreen):not(#readyScreen) > :last-child { margin-bottom:auto; }
+  .screen > * { flex-shrink:0; }
   h1 { font:400 clamp(56px, 19vw, 84px)/.92 var(--anton); text-transform:uppercase; margin:0; align-self:flex-start; text-align:left; }
   h1 .hl { background:var(--accent); padding:2px 8px 0; display:inline-block; margin-top:6px; transform:rotate(-1.5deg); }
   h2 { font:400 clamp(34px, 10vw, 48px)/1 var(--anton); text-transform:uppercase; margin:0; }
@@ -78,7 +83,7 @@
   @keyframes creep { to { transform:scaleX(.9); } }
 
   /* ready: SPIT BARS. */
-  #readyScreen { align-items:stretch; justify-content:space-between; }
+  #readyScreen { align-items:stretch; justify-content:space-between; gap:16px; }
   .spit { align-self:flex-start; }
   .readyRow { display:flex; align-items:center; gap:18px; text-align:left; }
   .avatar { width:min(34vw, 140px); aspect-ratio:1; object-fit:cover; border:6px solid #fff; outline:5px solid #111; box-shadow:8px 8px 0 #111;
@@ -94,7 +99,18 @@
   /* record + waiting: the whole phone is a big handheld mic */
   body:has(.micScreen.show) header { display:none; }
   body:has(.micScreen.show)::before { display:none; }
-  .micScreen { padding:14px 0 0; gap:0; justify-content:flex-start; }
+  .micScreen { padding:14px 0 0; gap:0; justify-content:flex-start; overflow:hidden; }
+  .micScreen > * { flex-shrink:1; }
+  body:has(.micScreen.show) { overflow:hidden; } /* only the full-screen mic locks scrolling */
+  #recScreen .meter { width:86%; height:30px; border-width:4px; }
+  .deaf { position:absolute; left:12px; right:12px; top:22%; z-index:4; font:400 clamp(32px, 10vw, 46px)/1 var(--anton); text-transform:uppercase;
+    background:var(--accent); color:#111; border:6px solid #111; box-shadow:8px 8px 0 #111; padding:18px 14px; cursor:pointer; animation:deafPulse .9s ease-in-out infinite alternate; }
+  @keyframes deafPulse { to { transform:scale(1.03) rotate(-1deg); } }
+  .sentTest { margin-top:6px; }
+  #countBig { position:absolute; inset:0; display:grid; place-items:center; z-index:2; pointer-events:none;
+    font:400 clamp(130px, 46vw, 260px)/1 var(--anton); color:var(--yellow); -webkit-text-stroke:7px #111; paint-order:stroke fill; text-shadow:10px 10px 0 #111; }
+  #countBig.small { font-size:clamp(64px, 22vw, 120px); }
+  #countBig:empty { display:none; }
   .bigmic { flex:1; width:100%; display:flex; flex-direction:column; align-items:center; min-height:0; }
   .bigmic .head { position:relative; width:min(86vw, 46vh); aspect-ratio:1; flex:0 0 auto; display:grid; place-items:center; }
   .bigmic .grille { position:relative; width:100%; height:100%; filter:drop-shadow(8px 8px 0 #111); }
@@ -113,7 +129,8 @@
   .meter b { display:block; height:100%; width:100%; background:var(--yellow); transform-origin:left; transform:scaleX(0); transition:transform .06s linear; }
   .timer { width:70%; height:8px; background:#333; overflow:hidden; }
   .timer b { display:block; height:100%; background:#ece6d6; transform-origin:left; transform:scaleX(1); }
-  .stop { margin-top:auto; font:700 13px var(--mono); text-transform:uppercase; letter-spacing:.08em; background:#ece6d6; color:#111; border:3px solid #ece6d6; border-radius:0; padding:6px 14px; cursor:pointer; }
+  /* Stop lives in the top corner, away from the palm holding the phone */
+  .stop { position:absolute; top:12px; right:12px; z-index:3; font:700 15px var(--mono); text-transform:uppercase; letter-spacing:.08em; background:#ece6d6; color:#111; border:4px solid #111; box-shadow:4px 4px 0 #111; border-radius:0; padding:10px 16px; cursor:pointer; }
   .stop:active { transform:translate(2px,2px); }
   #sentText { color:#ece6d6; font-size:15px; text-align:center; max-width:100%; padding:0 4px; }
   .waitnote { margin-top:auto; color:var(--yellow); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; text-align:center; }
@@ -132,15 +149,16 @@
 </style>
 </head>
 <body>
-<header><span><span id="dot"></span><b>Duet Anything</b></span><span id="hdrRight">mic</span></header>
+<header><span><span id="dot"></span><b>Duet Anything</b></span><span><span id="hdrRight">mic</span><span data-mic-chip></span></span></header>
 <main>
   <!-- 1. Snap -->
   <section class="screen show" id="snapScreen">
     <h1>Snap<br><span class="hl">anything.</span></h1>
-    <label class="big" id="snapBtn" for="cam">SNAP<small>it'll sing with you</small></label>
+    <label class="big" id="snapBtn" for="cam">SNAP<small>it comes alive</small></label>
     <input type="file" id="cam" accept="image/*" capture="environment">
     <p id="snapHint">Mug, trainer, your mate's head. Anything.</p>
     <div class="tip hidden" id="micTip"></div>
+    <button class="mt-test" data-mic-test type="button">🎤 Test mic</button>
   </section>
 
   <!-- 1b. Waking: googly-eye sticker + photocopied status lines -->
@@ -163,8 +181,10 @@
       <div class="readyWho"><small>VS</small><div id="charName">Mug Jagger</div><div class="songtitle" id="songTitle"></div></div>
     </div>
     <div class="hold">Hold your phone<br>like a mic</div>
-    <p id="readyHint">Watch the big screen. Your lines pop up here.</p>
+    <p id="readyHint">Watch the big screen. This phone is your mic.</p>
     <div class="tip hidden" id="micTip2"></div>
+    <button class="mt-test" data-mic-test type="button" style="align-self:center">🎤 Test mic</button>
+    <div class="tip hidden" id="wakeTip">Set your screen timeout to 10 min so the phone doesn't sleep mid-battle.</div>
   </section>
 
   <!-- 3. Record: the whole phone IS the microphone -->
@@ -183,6 +203,7 @@
           <path d="M40 60 Q70 22 120 18" fill="none" stroke="#ece6d6" stroke-width="10" stroke-linecap="round" opacity=".7" clip-path="url(#ball)"/>
           <circle cx="100" cy="100" r="90" fill="none" stroke="#111" stroke-width="8"/>
         </svg>
+        <div id="countBig" aria-live="polite"></div>
       </div>
       <div class="collar"></div>
       <div class="handle">
@@ -190,9 +211,9 @@
         <div id="lineText"></div>
         <div class="meter"><b id="meter"></b></div>
         <div class="timer"><b id="timer"></b></div>
-        <button class="stop" id="stopBtn" type="button">Stop</button>
       </div>
     </div>
+    <button class="stop" id="stopBtn" type="button">Stop</button>
   </section>
 
   <!-- 3b. Sent / waiting: same mic, switched off -->
@@ -208,6 +229,7 @@
       <div class="handle">
         <div class="band"><span id="sentTitle">Sound!</span></div>
         <p id="sentText">Got your bit. Keep watching the stage.</p>
+        <button class="mt-test sentTest" data-mic-test type="button">🎤 Test mic</button>
         <small class="waitnote">wait for your turn</small>
       </div>
     </div>

@@ -1,6 +1,7 @@
 // Duet Anything - stage (laptop / projector). Owns index.html + stage.css.
 import { onPhone, status } from "./api.js";
 import { refreshRoster, renderGallery, pickCrowd, createCrowd } from "./crowd.js";
+import { createCaptions } from "./captions.js";
 
 // ---------- beats.js (written by another bot) - every call guarded ----------
 let beats = {};
@@ -17,6 +18,8 @@ const Beat = {
   },
   sting(n) { try { beats.playSting?.(n); } catch (e) { console.warn("[stage] sting", e); } },
   duck(on) { try { beats.setDuck?.(on); } catch (e) { console.warn("[stage] duck", e); } },
+  bpm() { try { return +beats.getBpm?.() || 0; } catch { return 0; } },
+  nextBarMs() { try { return Math.max(0, Math.min(4000, +beats.msToNextBar?.() || 0)); } catch { return 0; } },
 };
 
 // ---------- DOM ----------
@@ -28,6 +31,8 @@ const el = {
   rec: $("rec"), count: $("count"), recState: $("recState"), got: $("got"), judging: $("judging"),
   scoreNum: $("scoreNum"), roast: $("roast"), bw: $("bw"), board: $("board"), againBtn: $("againBtn"),
   confetti: $("confetti"), toast: $("toast"), beatRing: $("beatRing"),
+  joinCode: $("joinCode"), joinMic: $("joinMic"), recTitle: $("recTitle"), turnClock: $("turnClock"), cooking: $("cooking"), vclose: $("vclose"), vcloseN: $("vcloseN"),
+  winner: $("winner"), memcard: $("memcard"), help: $("help"),
 };
 const glow = el.charWrap.querySelector(".char-glow");
 const eyeEls = [$("eyeL"), $("eyeR")];
@@ -36,16 +41,24 @@ const gmouth = $("gmouth"), mouthSmile = $("mouthSmile");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const setScreen = (s) => { document.body.dataset.screen = s; state = s; };
 function toast(msg, ms = 2600) { el.toast.textContent = msg; el.toast.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.toast.classList.remove("on"), ms); }
+// Host-only endpoints need localhost or x-host-token (/api/status gives hostToken on localhost; kept for tunnel use).
+let hostToken = "", demoCfg = { rounds: 3, youMs: 6000 };
+try { hostToken = new URLSearchParams(location.search).get("token") || sessionStorage.getItem("duetHostToken") || ""; } catch {}
+function rememberStatus(s) {
+  if (s?.hostToken) { hostToken = s.hostToken; try { sessionStorage.setItem("duetHostToken", hostToken); } catch {} }
+  if (s?.battle?.rounds) demoCfg = { rounds: Math.max(1, Math.min(3, +s.battle.rounds || 3)), youMs: 6000 };
+}
 async function postJson(url, body) {
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...(hostToken ? { "x-host-token": hostToken } : {}) }, body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`${url} ${res.status}`);
   return res.json().catch(() => ({}));
 }
-const broadcast = (ev) => (session?.demo && ev.type !== "reset") ? Promise.resolve() : postJson("/api/broadcast", ev).catch(() => postJson("/api/phone", ev)).catch(() => {});
+const broadcast = (ev) => { if (session?.demo && ev.type !== "reset") ev = { ...ev, demo: true, id: ev.id || session.id }; return postJson("/api/broadcast", ev).catch(() => postJson("/api/phone", ev)).catch(() => {}); };
 
 // ---------- Audio: one context, analyser feeds the mouth ----------
 let ctx = null, analyser = null, levelBuf = null, unlocked = false;
 let fakeTalk = 0; // >0 while speechSynthesis fallback is talking
+let freqBuf = null, fakeRound = 0.3; // mouth "O" vs wide: low vs high energy in the voice
 function ensureAudio() {
   if (ctx) return ctx;
   ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -54,6 +67,7 @@ function ensureAudio() {
   analyser.smoothingTimeConstant = 0.5;
   analyser.connect(ctx.destination);
   levelBuf = new Uint8Array(analyser.fftSize);
+  freqBuf = new Uint8Array(analyser.frequencyBinCount);
   return ctx;
 }
 async function unlock() {
@@ -67,8 +81,19 @@ async function unlock() {
 el.gateBtn.addEventListener("click", unlock);
 el.gateBtn.addEventListener("click", () => loadSeg().then((m) => m?.preloadSegmenter()), { once: true }); // warm the cut-out model
 
+/** 0..1 how rounded the current sound is (low-heavy = "O", bright = wide). */
+function voiceRound() {
+  if (fakeTalk > 0) return fakeRound;
+  if (!analyser || !freqBuf) return 0.3;
+  analyser.getByteFrequencyData(freqBuf);
+  let lo = 0, hi = 0;
+  for (let i = 3; i < 12; i++) lo += freqBuf[i];
+  for (let i = 30; i < 90; i++) hi += freqBuf[i];
+  lo /= 9; hi /= 60;
+  return lo + hi > 1 ? lo / (lo + hi * 1.7) : 0.3;
+}
 function voiceLevel() {
-  if (fakeTalk > 0) { const t = performance.now() / 1000; return 0.35 + 0.35 * Math.abs(Math.sin(t * 11)) * (0.6 + 0.4 * Math.sin(t * 3.7)); }
+  if (fakeTalk > 0) { const t = performance.now() / 1000; return 0.3 + 0.45 * Math.abs(Math.sin(t * 10.5)) * (0.55 + 0.45 * Math.sin(t * 3.7)); }
   if (!analyser) return 0;
   analyser.getByteTimeDomainData(levelBuf);
   let sum = 0;
@@ -77,7 +102,8 @@ function voiceLevel() {
 }
 
 /** Play an MP3 through the analyser. Resolves when it ends (or times out). onMeta gets the real duration in ms. */
-function playMp3(url, maxMs, onMeta) {
+// lock = beat-locked: start on the next bar downbeat and nudge playbackRate (+/-6%, pitch kept) so the clip spans whole bars.
+function playMp3(url, maxMs, onMeta, onEl, lock = false) {
   return new Promise((resolve, reject) => {
     ensureAudio();
     const a = new Audio();
@@ -87,12 +113,27 @@ function playMp3(url, maxMs, onMeta) {
     const finish = (err) => { if (done) return; done = true; clearTimeout(timer); try { src.disconnect(); } catch {} err ? reject(err) : resolve(); };
     const src = ctx.createMediaElementSource(a);
     src.connect(analyser);
-    a.addEventListener("loadedmetadata", () => { if (isFinite(a.duration)) { onMeta?.(a.duration * 1000); clearTimeout(timer); timer = setTimeout(() => finish(), a.duration * 1000 + 1500); } });
+    const go = () => { if (!done) a.play().catch(finish); };
+    a.addEventListener("loadedmetadata", () => {
+      if (!isFinite(a.duration)) { if (lock) go(); return; }
+      let wait = 0;
+      const bpm = lock ? Beat.bpm() : 0;
+      if (bpm) {
+        const bar = 240 / bpm, bars = Math.max(1, Math.round(a.duration / bar));
+        a.preservesPitch = true;
+        a.playbackRate = Math.max(0.94, Math.min(1.06, a.duration / (bars * bar)));
+        wait = Beat.nextBarMs();
+      }
+      const real = (a.duration * 1000) / (a.playbackRate || 1);
+      onMeta?.(real); clearTimeout(timer); timer = setTimeout(() => finish(), real + wait + 1500);
+      if (lock) setTimeout(go, wait);
+    });
     a.addEventListener("ended", () => finish());
     a.addEventListener("error", () => finish(new Error("audio error")));
-    timer = setTimeout(() => finish(), (maxMs || 6000) + 2500);
+    timer = setTimeout(() => finish(), (maxMs || 6000) + 2500 + (lock ? 3000 : 0));
     playing.add(a);
-    a.play().catch(finish);
+    try { onEl?.(a); } catch {}
+    if (!lock) a.play().catch(finish);
     a.addEventListener("ended", () => playing.delete(a));
   });
 }
@@ -100,7 +141,7 @@ const playing = new Set();
 function stopAllAudio() { for (const a of playing) { try { a.pause(); } catch {} } playing.clear(); try { speechSynthesis.cancel(); } catch {} fakeTalk = 0; }
 
 /** Free fallback voice (MOCK / missing audio): browser speech + fake mouth. */
-function speakFallback(text, ms, colourSeed = 0) {
+function speakFallback(text, ms, colourSeed = 0, hooks = null) {
   return new Promise((resolve) => {
     let done = false;
     const end = () => { if (done) return; done = true; fakeTalk = Math.max(0, fakeTalk - 1); resolve(); };
@@ -111,6 +152,7 @@ function speakFallback(text, ms, colourSeed = 0) {
       if (gb.length) u.voice = gb[colourSeed % gb.length];
       u.rate = 1.05; u.pitch = 0.8 + (colourSeed % 5) * 0.12;
       u.onend = end; u.onerror = end;
+      if (hooks) { u.onstart = () => hooks.start?.(); u.onboundary = (e) => { if (!e.name || e.name === "word") hooks.boundary?.(e.charIndex); }; }
       speechSynthesis.speak(u);
     } catch { /* no speech: mouth still flaps for ms */ }
     setTimeout(end, (ms || 3000) + 1500);
@@ -228,15 +270,28 @@ requestAnimationFrame(layoutChar);
 const pupilsP = eyeEls.map((e) => ({ node: e.querySelector(".pupil"), lid: e.querySelector(".lid"), x: 0, y: 1, vx: 0, vy: 0 }));
 const GRAV = 14, DAMP = 1.6, REST = 0.55;
 let blinkT = -1, nextBlink = performance.now() + 2500;
+let gaze = null, nextGlance = performance.now() + 4000; // { x, y, until } in eye-radius units
+function lookAt(x, y, ms = 600) { const r = Math.hypot(x, y) || 1, k = Math.min(1, r) * 0.9 / r; gaze = { x: x * k, y: y * k, until: performance.now() + ms }; }
+/** Point the pupils at a DOM element (the word being said, the singer...). */
+function lookAtEl(node, ms) {
+  try {
+    const e = eyeEls[0].getBoundingClientRect(), t = node.getBoundingClientRect();
+    lookAt((t.left + t.width / 2) - (e.left + e.width / 2), (t.top + t.height / 2) - (e.top + e.height / 2), ms);
+  } catch {}
+}
 function stepPupils(dt, accPx, kick, now) {
   const k = eyeTravel > 0 ? 1 / eyeTravel : 0;
   for (let i = 0; i < pupilsP.length; i++) {
     const p = pupilsP[i];
     // Inertia: when the body accelerates up the pupil feels pushed down, and vice versa (x too)
-    const ax = Math.max(-120, Math.min(120, -accPx.x * k * 0.6)) + Math.sin(now / 900 + i) * 1.2;
-    const ay = GRAV - Math.max(-120, Math.min(120, accPx.y * k * 0.6));
-    if (kick) { p.vx += (Math.random() - 0.5) * 7 * kick; p.vy -= (2.5 + Math.random() * 4) * kick; }
-    p.vx += (ax - p.vx * DAMP) * dt; p.vy += (ay - p.vy * DAMP) * dt;
+    const g = gaze && now < gaze.until ? gaze : null;
+    const inX = Math.max(-120, Math.min(120, -accPx.x * k * 0.6)), inY = Math.max(-120, Math.min(120, accPx.y * k * 0.6));
+    // Looking at something: a stiff, damped pull toward the target (eyes dart, then settle). Otherwise: googly gravity.
+    const ax = g ? (g.x - p.x) * 160 + inX * 0.25 : inX + Math.sin(now / 900 + i) * 1.2;
+    const ay = g ? (g.y - p.y) * 160 - inY * 0.25 : GRAV - inY;
+    const damp = g ? 16 : DAMP;
+    if (kick) { p.vx += (Math.random() - 0.5) * 7 * kick * (g ? 0.3 : 1); p.vy -= (2.5 + Math.random() * 4) * kick * (g ? 0.3 : 1); }
+    p.vx += (ax - p.vx * damp) * dt; p.vy += (ay - p.vy * damp) * dt;
     p.x += p.vx * dt; p.y += p.vy * dt;
     const r = Math.hypot(p.x, p.y);
     if (r > 1) {
@@ -247,9 +302,15 @@ function stepPupils(dt, accPx, kick, now) {
     }
     p.node.style.transform = `translate3d(${(p.x * eyeTravel).toFixed(2)}px, ${(p.y * eyeTravel).toFixed(2)}px, 0)`;
   }
-  if (blinkT < 0 && now > nextBlink) { blinkT = 0; nextBlink = now + 1800 + Math.random() * 3200; if (Math.random() < 0.2) nextBlink = now + 320; }
+  // Natural blinks: every 3-6s, sometimes a quick double-blink
+  if (blinkT < 0 && now > nextBlink) { blinkT = 0; nextBlink = now + 3000 + Math.random() * 3000; if (Math.random() < 0.18) nextBlink = now + 240; }
   let lid = 0;
-  if (blinkT >= 0) { blinkT += dt; const q = blinkT / 0.18; lid = q >= 1 ? 0 : Math.sin(q * Math.PI); if (q >= 1) blinkT = -1; }
+  if (blinkT >= 0) { blinkT += dt; const q = blinkT / 0.15; lid = q >= 1 ? 0 : q < 0.4 ? q / 0.4 : 1 - (q - 0.4) / 0.6; if (q >= 1) blinkT = -1; }
+  // Occasional glances: toward the lyrics, down at the crowd, or straight at the player
+  if (now > nextGlance) {
+    nextGlance = now + 3500 + Math.random() * 4000;
+    if (!gaze || now > gaze.until) { const r = Math.random(); r < 0.45 ? lookAt(0.95, -0.15, 900) : r < 0.75 ? lookAt(0.25, 0.95, 700) : lookAt(0, 0.05, 1000); }
+  }
   const lidS = `scaleY(${lid.toFixed(3)})`;
   for (const p of pupilsP) p.lid.style.transform = lidS;
 }
@@ -267,7 +328,25 @@ function idlePose(t, nervous) {
   return pose({ br: Math.sin(t * 1.1 * sp) * 3, bx: Math.sin(t * 1.1 * sp) * 1.2, sy: 1 + breathe, sx: 1 - breathe * 0.8,
     aL1: 12 + Math.sin(t * 1.1 * sp) * 6, aR1: 12 - Math.sin(t * 1.1 * sp) * 6, aL2: 14, aR2: 14, lR3: tap * 16 });
 }
+/** Main dance: clear key poses that HIT on beats 1 and 3, grooves on 2 and 4, a dip of anticipation before each hit,
+ *  a head-nod snap on every beat and a kick-drum squash. Every 4th bar group swaps in the Madchester shuffle. */
 function dancePose(b, pulse) {
+  if (Math.floor(b / 16) % 3 === 2) return dancePoseOld(b, pulse);
+  const bar = Math.floor(b / 4), beat = ((b % 4) + 4) % 4, bi = Math.floor(beat), ph = beat - bi;
+  const alt = bar % 2 ? -1 : 1;
+  let p;
+  if (bi === 0) p = pose({ bx: 3 * alt, br: -7 * alt, by: -1.5, aL1: 150, aL2: 22, aR1: 150, aR2: 22, lL1: 18, lL2: -12, lR1: 6, lR2: -4 }); // arms-up V
+  else if (bi === 2) p = pose({ bx: -3 * alt, br: 8 * alt, by: 0.5, aL1: 100, aL2: -110, aR1: 75, aR2: 28, lL1: 4, lL2: -4, lR1: 26, lR2: -44, lR3: 10 }); // point + knee up
+  else p = pose({ bx: 0, br: 2 * alt, by: -0.5, aL1: 38, aL2: 52, aR1: 38, aR2: 52, lL1: 6, lL2: -6, lR1: 6, lR2: -6 }); // groove
+  const nod = Math.pow(1 - ph, 3); // snap down on the beat, ease back up
+  p.br += nod * 3.5 * alt; p.by += nod * 1.4;
+  const antic = ph > 0.8 ? (ph - 0.8) / 0.2 : 0; // gather before the next beat
+  p.by += antic * 2.2; p.sy -= antic * 0.07; p.sx += antic * 0.05; p.aL1 *= 1 - antic * 0.25; p.aR1 *= 1 - antic * 0.25;
+  const sq = pulse * 0.13; // kick drum squash
+  p.sy -= sq; p.sx += sq * 0.75;
+  return p;
+}
+function dancePoseOld(b, pulse) {
   const move = Math.floor(b / 8) % 4, ph = b % 1, side = Math.floor(b) % 2 ? 1 : -1;
   const sq = pulse * 0.09;
   const base = { sy: 1 - sq, sx: 1 + sq * 0.8, by: -Math.abs(Math.sin(Math.PI * b)) * 2.5 };
@@ -292,22 +371,42 @@ function dancePose(b, pulse) {
   return pose({ ...base, sx: (1 + sq * 0.8) * spin, br: wig * 9, bx: wig * 2, aL1: 70 + wig * 30, aR1: 70 - wig * 30, aL2: 60 + wig * 30, aR2: 60 - wig * 30,
     lL1: 8 + wig * 6, lR1: 8 - wig * 6, lL2: -10, lR2: -10, lL3: Math.max(0, wig) * 18, lR3: Math.max(0, -wig) * 18 });
 }
-function singArms(p, t, lvl) { // mic hand (left) to the mouth, right arm reaching out dramatically
+function singArms(p, t, lvl) { // mic hand (left) to the mouth; right hand raps along with every word (see gestures)
   const reach = 0.5 + Math.min(1, lvl * 1.6) * 0.5;
-  return { ...p, aL1: 14, aL2: -140, aR1: 60 + reach * 50 + Math.sin(t * 2.2) * 8, aR2: 25 - reach * 20 + Math.sin(t * 3.1) * 6, br: p.br * 0.5 + 3 * reach, mic: 1 };
+  const out = { ...p, aL1: 14, aL2: -140, aR1: 55 + reach * 40, aR2: 30 - reach * 20, br: p.br * 0.6 + 3 * reach, mic: 1 };
+  return applyGesture(out, true);
+}
+// Word-synced gestures from the captions: point at the player on "you", hands up on the punchline, a chop otherwise.
+let gesture = null; // { type, at, ms }
+function setGesture(type, ms) { gesture = { type, at: performance.now(), ms }; }
+function applyGesture(p, singing) {
+  if (!gesture) return p;
+  const k = (performance.now() - gesture.at) / gesture.ms;
+  if (k >= 1) { gesture = null; return p; }
+  const env = k < 0.15 ? k / 0.15 : 1 - Math.max(0, (k - 0.6) / 0.4); // snap in, hold, release
+  const mix = (a, b) => a + (b - a) * env;
+  if (gesture.type === "point") return { ...p, aR1: mix(p.aR1, 92), aR2: mix(p.aR2, -6), br: mix(p.br, p.br - 5), bx: mix(p.bx, p.bx + 1.5) };
+  if (gesture.type === "hands") return { ...p, aR1: mix(p.aR1, 168), aR2: mix(p.aR2, 8), aL1: singing ? mix(p.aL1, 150) : mix(p.aL1, 168), aL2: singing ? p.aL2 : mix(p.aL2, 8), sy: mix(p.sy, p.sy + 0.06), by: mix(p.by, p.by - 2) };
+  if (gesture.type === "chop") return { ...p, aR1: mix(p.aR1, p.aR1 + 28), aR2: mix(p.aR2, p.aR2 - 34) };
+  return p;
 }
 function listenPose(t, b) { // hand cupped to ear, leaning in, foot tapping impatiently
   const tap = Math.max(0, Math.sin(TAU * (b ?? t * 1.7) * 2));
   return pose({ br: 8 + Math.sin(t * 1.3) * 1.5, bx: 3, sy: 1 + Math.sin(t * 2) * 0.015, aR1: 150, aR2: -220, aL1: 38, aL2: -95,
     lL1: 3, lL2: -3, lL3: tap * 26, lR1: 6, lR2: -8 });
 }
-function celebratePose(t) {
+function celebratePose(t, since = 9) {
+  if (since < 0.3) { const k = since / 0.3; return pose({ by: 3 * k, sy: 1 - 0.18 * k, sx: 1 + 0.13 * k, aL1: 20, aR1: 20, aL2: 70, aR2: 70, lL1: 16 * k, lL2: -34 * k, lR1: 16 * k, lR2: -34 * k }); } // crouch
+  if (since < 1.1) { const k = (since - 0.3) / 0.8, air = Math.sin(Math.PI * k); // big jump with a fake 360 spin
+    return pose({ by: -air * 24, sy: 1 + air * 0.12, sx: (1 - air * 0.05) * Math.cos(TAU * Math.min(1, k * 1.15)), aL1: 172, aR1: 172, aL2: 8, aR2: 8, lL1: 10 + air * 30, lL2: -air * 85, lR1: 10 + air * 30, lR2: -air * 85 }); }
   const ph = (t * 1.6) % 1, air = Math.sin(Math.PI * ph);
   const land = ph < 0.12 ? 1 - ph / 0.12 : ph > 0.9 ? (ph - 0.9) / 0.1 : 0;
   return pose({ by: -air * 14, sy: 1 + air * 0.08 - land * 0.14, sx: 1 - air * 0.05 + land * 0.12, br: Math.sin(t * 3.2) * 5,
     aL1: 160 + Math.sin(t * 9) * 8, aR1: 160 - Math.sin(t * 9) * 8, aL2: 12, aR2: 12, lL1: 10 + air * 28, lL2: -air * 70, lR1: 10 + air * 28, lR2: -air * 70 });
 }
-function facepalmPose(t) {
+function facepalmPose(t, since = 9) {
+  if (since < 0.35) { const k = since / 0.35; return pose({ br: 12 * k, by: -2 * k, sy: 1 + 0.05 * k, aL1: 120, aL2: 40, aR1: 120, aR2: 40, lL1: 8, lR1: 8 }); } // recoil "oh no"
+  if (since < 3) return pose({ br: -6 + Math.sin(t * 6.5) * 4, by: 2, sy: 0.9, sx: 1.06, aL1: 10, aL2: -165, aR1: 4, aR2: 4, lL1: 2, lL2: -2, lR1: 8, lR2: -12 }); // head-shake into the hand
   return pose({ br: -5, by: 1.5, sy: 0.94, sx: 1.04, bx: Math.sin(t * 2.4) * 1.5, aL1: 10, aL2: -165, aR1: 4, aR2: 4, lL1: 2, lL2: -2, lR1: 8, lR2: -12 });
 }
 function laughPose(t) { // doubling over, holding the belly, shaking with laughter
@@ -317,12 +416,13 @@ function laughPose(t) { // doubling over, holding the belly, shaking with laught
 }
 
 // Damped springs per joint; lower segments are softer so they lag = secondary motion.
-const SPR = { bx: 160, by: 220, br: 120, sx: 260, sy: 260, aL1: 110, aR1: 110, aL2: 70, aR2: 70, lL1: 210, lR1: 210, lL2: 170, lR2: 170, lL3: 240, lR3: 240, mic: 60 };
+const SPR = { bx: 300, by: 420, br: 260, sx: 620, sy: 620, aL1: 300, aR1: 300, aL2: 190, aR2: 190, lL1: 380, lR1: 380, lL2: 300, lR2: 300, lL3: 420, lR3: 420, mic: 90 };
+const ZETA = { bx: 0.55, by: 0.5, br: 0.5, sx: 0.32, sy: 0.32, aL1: 0.52, aR1: 0.52, aL2: 0.58, aR2: 0.58, mic: 0.9 }; // damping ratio (default 0.6)
 const springs = Object.fromEntries(Object.keys(SPR).map((k) => [k, { x: pose({})[k], v: 0 }]));
 function stepSprings(target, dt) {
   const out = {};
   for (const k in springs) {
-    const s = springs[k], K = SPR[k], C = 2 * Math.sqrt(K) * 0.72;
+    const s = springs[k], K = SPR[k], C = 2 * Math.sqrt(K) * (ZETA[k] ?? 0.6);
     s.v += ((target[k] - s.x) * K - s.v * C) * dt;
     s.x += s.v * dt;
     out[k] = s.x;
@@ -361,13 +461,13 @@ function targetPose(t, pulse, lvl) {
   if (poseOverride && state !== "idle") return overridePose(poseOverride, t, b, pulse, lvl);
   if (state === "result" && charMode.verdict) {
     const since = (performance.now() - charMode.verdictAt) / 1000;
-    if (since < 3.6 || charMode.verdict === "laugh") return charMode.verdict === "celebrate" ? celebratePose(t) : charMode.verdict === "facepalm" ? facepalmPose(t) : laughPose(t);
+    if (since < 3.6 || charMode.verdict === "laugh") return charMode.verdict === "celebrate" ? celebratePose(t, since) : charMode.verdict === "facepalm" ? facepalmPose(t, since) : laughPose(t);
     return lvl > 0.05 || fakeTalk > 0 ? laughPose(t) : idlePose(t);
   }
   if (state === "show" && charMode.listening) return listenPose(t, b);
   if (state === "show" && el.judging.classList.contains("on")) return idlePose(t, true);
   const base = state === "show" && b != null ? dancePose(b, pulse) : idlePose(t);
-  return charMode.singing ? singArms(base, t, lvl) : base;
+  return charMode.singing ? singArms(base, t, lvl) : applyGesture(base, false);
 }
 
 // ---------- Roster gallery (idle) + karaoke crowd (crowd.js) ----------
@@ -396,20 +496,51 @@ function crowdTick(now, dt, pulse) {
 
 // ---------- Render loop: pose springs, mouth, googly eyes, glow, beat ring (transform/opacity only) ----------
 let mouthLvl = 0, bounce = 0, ringT = 0, lastPulse = 0, lastT = performance.now();
+// Mouth shapes [scaleX, scaleY]: closed, small, wide, "O". Picked from loudness + how rounded the sound is.
+const MOUTH = { closed: [0.9, 0], small: [0.72, 0.34], wide: [1.08, 0.58], o: [0.62, 0.98] };
+let mShape = "closed", mShapeAt = 0, mS = [0.9, 0], jaw = 0, jawV = 0;
+let entrance = null; // { y, v, bounces } in U units, the character drops in from the top
+function startEntrance() { entrance = { y: -150, v: 0, bounces: 0 }; }
+function dustPuff() {
+  const d = document.createElement("div");
+  d.className = "dust";
+  d.innerHTML = Array.from({ length: 7 }, (_, i) => { const a = Math.PI * (0.05 + (i / 6) * 0.9); return `<i style="--dx:${(-Math.cos(a) * 150).toFixed(0)}px;--dy:${(-Math.sin(a) * 50 - 10).toFixed(0)}px;animation-delay:${(i % 3) * 30}ms"></i>`; }).join("");
+  el.charWrap.appendChild(d);
+  setTimeout(() => d.remove(), 900);
+}
 let lastBody = { x: 0, y: 0 }, lastBodyV = { x: 0, y: 0 }, micOn = false;
 function frame() {
   const now = performance.now(), t = now / 1000;
   const dt = Math.min(0.05, Math.max(0.001, (now - lastT) / 1000)); lastT = now;
+  caps.tick(now);
   const target = voiceLevel();
-  mouthLvl += (target - mouthLvl) * (target > mouthLvl ? 0.55 : 0.25);
-  const open = Math.min(1, mouthLvl * 1.15);
-  el.mouth.style.transform = `scaleY(${(open < 0.04 ? 0 : 0.15 + open * 0.85).toFixed(3)}) scaleX(${(0.8 + open * 0.2).toFixed(3)})`;
-  mouthSmile.style.opacity = Math.max(0, 1 - open * 6).toFixed(3);
+  mouthLvl += (target - mouthLvl) * (target > mouthLvl ? 0.6 : 0.3);
+  const want = mouthLvl < 0.07 ? "closed" : mouthLvl < 0.26 ? "small" : (mouthLvl > 0.75 || voiceRound() > 0.62) ? "o" : "wide";
+  if (want !== mShape && now - mShapeAt > 55) { // hold each shape briefly: crisp flaps, no flicker
+    if ((MOUTH[want][1] - MOUTH[mShape][1]) > 0.25) jawV += 9; // louder syllable: little jaw bounce
+    mShape = want; mShapeAt = now;
+  }
+  const mt = MOUTH[mShape];
+  mS[0] += (mt[0] - mS[0]) * 0.5; mS[1] += (mt[1] - mS[1]) * 0.5;
+  jawV += (-jaw * 260 - jawV * 18) * dt; jaw += jawV * dt;
+  el.mouth.style.transform = `scale(${mS[0].toFixed(3)}, ${Math.max(0, mS[1]).toFixed(3)})`;
+  gmouth.style.transform = `translate3d(0, ${(jaw * 2.2 + mS[1] * 3).toFixed(2)}px, 0)`;
+  mouthSmile.style.opacity = Math.max(0, 1 - mS[1] * 6).toFixed(3);
 
   const p = Beat.pulse();
   bounce += (p - bounce) * 0.35;
   const q = stepSprings(targetPose(t, bounce, mouthLvl), dt);
-  rigEl.rig.style.transform = `translate3d(${(q.bx * U).toFixed(2)}px, ${(q.by * U).toFixed(2)}px, 0) rotate(${q.br.toFixed(2)}deg)`;
+  let dropY = 0;
+  if (entrance) { // gravity drop, one bounce, squash + dust on landing
+    entrance.v += 900 * dt; entrance.y += entrance.v * dt;
+    if (entrance.y >= 0) {
+      entrance.y = 0;
+      if (entrance.bounces++ < 1) { springs.sy.v -= 10; springs.sx.v += 8; springs.by.v += 40; dustPuff(); stepPupils(0.001, { x: 0, y: 0 }, 1.5, now); entrance.v = -entrance.v * 0.28; }
+      else entrance = null;
+    }
+    if (entrance) { dropY = entrance.y; const st = Math.min(0.14, Math.abs(entrance.v) * 0.0006); q.sy += st; q.sx -= st * 0.7; }
+  }
+  rigEl.rig.style.transform = `translate3d(${(q.bx * U).toFixed(2)}px, ${((q.by + dropY) * U).toFixed(2)}px, 0) rotate(${q.br.toFixed(2)}deg)`;
   rigEl.body.style.transform = `scale(${q.sx.toFixed(4)}, ${q.sy.toFixed(4)})`;
   applyLimb(limbs.armL, q.aL1, q.aL2, 0, false); applyLimb(limbs.armR, q.aR1, q.aR2, 0, true);
   applyLimb(limbs.legL, q.lL1, q.lL2, q.lL3, false); applyLimb(limbs.legR, q.lR1, q.lR2, q.lR3, true);
@@ -445,20 +576,30 @@ function setAccent(hex) {
 // ---------- Idle ----------
 let state = "idle";
 async function loadIdle() {
+  try { // fast path: /api/audience answers instantly (/api/status pings memory, up to 3 s)
+    const a = await (await fetch("/api/audience")).json();
+    if (a?.code && a.joinUrl && el.joinCode.textContent === "----") {
+      el.joinCode.textContent = String(a.code).toUpperCase();
+      el.phoneUrl.textContent = String(a.joinUrl).replace(/^https?:\/\//, "");
+      drawQr(`${a.joinUrl}?code=${encodeURIComponent(a.code)}`);
+    }
+  } catch {}
   try {
     const s = await status();
-    let url;
-    if (s.micUrl) url = String(s.micUrl); // HTTPS LAN link so the phone mic works over Wi-Fi - use as-is
-    else {
-      url = s.phoneUrl || `${location.origin}/mic.html`;
-      try { const u = new URL(url); u.pathname = "/mic.html"; url = u.toString(); } catch {}
-    }
-    el.phoneHint.textContent = /^https:/i.test(url) ? "First time: tap Advanced → Proceed" : "";
-    el.phoneUrl.textContent = url.replace(/^https?:\/\//, "");
+    rememberStatus(s);
+    const code = String(s.roomCode || "").toUpperCase();
+    const play = String(s.playUrl || (s.publicUrl ? `${s.publicUrl}/play` : `${location.origin}/play`));
+    const url = code ? `${play}?code=${encodeURIComponent(code)}` : play;
+    el.joinCode.textContent = code || "----";
+    el.phoneUrl.textContent = play.replace(/^https?:\/\//, "");
+    el.phoneHint.textContent = "";
+    let mic = s.micUrl ? String(s.micUrl) : "";
+    if (!mic) { mic = s.phoneUrl || `${location.origin}/mic.html`; try { const u = new URL(mic); u.pathname = "/mic.html"; mic = u.toString(); } catch {} }
+    el.joinMic.innerHTML = `Single phone, mic only: <b>${esc(mic.replace(/^https?:\/\//, ""))}</b>${/^https:\/\/\d/.test(mic) ? " (tap Advanced → Proceed)" : ""}`;
     drawQr(url);
   } catch {
-    el.phoneUrl.textContent = `${location.host}/mic.html`;
-    drawQr(`${location.origin}/mic.html`);
+    el.phoneUrl.textContent = `${location.host}/play`;
+    drawQr(`${location.origin}/play`);
   }
   refreshBoard();
 }
@@ -466,7 +607,7 @@ function drawQr(url) {
   try {
     const q = window.qrcode(0, "M");
     q.addData(url); q.make();
-    el.qr.innerHTML = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+    el.qr.innerHTML = q.createSvgTag({ cellSize: 8, margin: 0, scalable: true });
   } catch { el.qr.classList.add("empty"); }
 }
 async function getBoard() {
@@ -486,6 +627,7 @@ function goIdle() {
   run++;
   stopAllAudio(); Beat.stop(); stopConfetti();
   el.rec.classList.remove("live"); el.got.classList.remove("show"); el.judging.classList.remove("on");
+  for (const n of [el.turnClock, el.cooking, el.vclose, el.memcard]) n.classList.remove("on");
   el.idleCta.classList.remove("waking"); el.idleCtaText.textContent = "Snap anything to start";
   session = null; poseOverride = null;
   setAccent("#ff5a36");
@@ -500,35 +642,33 @@ const takeWaiters = new Map();    // line index -> resolve
 class Aborted extends Error {}
 const guard = (myRun) => { if (myRun !== run) throw new Aborted(); };
 
-function buildLyrics(lines, name) {
-  el.track.innerHTML = lines.map((l, i) => `
-    <div class="ln ${l.who === "you" ? "you" : "obj"}" data-i="${i}">
-      <div class="who">${l.who === "you" ? "&#127908; You" : esc(name)}</div>
-      <div class="txt"><span class="base">${esc(l.text)}</span><span class="wipe"><span class="wipe-in">${esc(l.text)}</span></span></div>
-    </div>`).join("");
-  el.track.style.transform = "translate3d(0,0,0)";
-}
-let wipeAnims = [];
-function focusLine(i) {
-  const rows = [...el.track.children];
-  rows.forEach((r, k) => { r.classList.toggle("past", k < i); r.classList.toggle("current", k === i); r.classList.toggle("next", k === i + 1); });
-  const row = rows[i];
-  if (!row) return;
-  const slot = el.lyrics.clientHeight * 0.3;
-  el.track.style.transform = `translate3d(0, ${(slot - row.offsetTop).toFixed(1)}px, 0)`;
-}
-function wipe(i, ms) {
-  const row = el.track.children[i];
-  if (!row) return;
-  const w = row.querySelector(".wipe"), wi = row.querySelector(".wipe-in");
-  wipeAnims.forEach((a) => a.cancel?.());
-  wipeAnims = [
-    w.animate([{ transform: "translate3d(-101%,0,0)" }, { transform: "translate3d(0,0,0)" }], { duration: ms, easing: "linear", fill: "forwards" }),
-    wi.animate([{ transform: "translate3d(101%,0,0)" }, { transform: "translate3d(0,0,0)" }], { duration: ms, easing: "linear", fill: "forwards" }),
-  ];
-}
-function retimeWipe(ms) { // real MP3 duration arrived: stretch the running wipe
-  for (const a of wipeAnims) { try { const t = a.currentTime || 0; a.effect.updateTiming({ duration: Math.max(ms, t + 50) }); } catch {} }
+// Kinetic captions (captions.js): one chunk at a time, each word pops exactly when it's said.
+const caps = createCaptions({ lyrics: el.lyrics, track: el.track, onWord: onCaptionWord });
+function buildLyrics(lines, name) { caps.reset(lines, name); }
+function focusLine(i) { caps.focus(i); }
+function wipe(i, ms) { caps.start(i, ms); }          // start the line's word clock (estimate until real audio attaches)
+function retimeWipe(ms) { caps.retime(ms); }         // real MP3 duration arrived
+const YOU_WORD = /^(you|your|youre|yours|ya|yer|yourself)$/;
+let lastPunchSfx = 0;
+function onCaptionWord({ word, punch, last, kind, el: wordEl }) {
+  if (state !== "show") return;
+  const w = word.toLowerCase().replace(/[’']/g, "").replace(/[^a-z]/g, "");
+  if (Math.random() < 0.7 || punch) lookAtEl(wordEl, 450); // eyes dart to the word
+  if (kind === "said") return; // the player's own words: just watch them
+  if (kind === "obj") {
+    if (punch) setGesture("hands", 560);
+    else if (YOU_WORD.test(w)) setGesture("point", 480);
+    else setGesture("chop", 240);
+    if (!session?.mock || fakeTalk) { fakeRound = punch ? 0.9 : Math.random(); }
+  } else if (punch) setGesture("hands", 520); // karaoke hype man
+  if (punch) {
+    el.lyrics.classList.remove("shake"); void el.lyrics.offsetWidth; el.lyrics.classList.add("shake");
+    if (last && kind === "obj") { // the line's final punchline: camera punch-in (+ crowd "ooooh" unless mild)
+      const diff = session?.difficulty || gameDifficulty;
+      try { el.show.animate([{ transform: `scale(${diff === "savage" ? 1.045 : 1.025})` }, { transform: "none" }], { duration: 420, easing: "cubic-bezier(.2,.8,.3,1)" }); } catch {}
+      if (diff !== "mild" && performance.now() - lastPunchSfx > 4000) { lastPunchSfx = performance.now(); window.playSfx?.("ooooh"); }
+    }
+  }
 }
 
 async function startShow(s) {
@@ -555,12 +695,16 @@ async function startShow(s) {
   el.songTitle.textContent = s.song.title || "Untitled Banger";
   setFac(s.mode === "battle" || s.battle ? "ROAST BATTLE" : s.mode === "karaoke" ? "KARAOKE" : "DUET");
   el.show.classList.toggle("is-returning", !!s.returning);
+  { const fac = $("facLabel"); if (fac) fac.dataset.diff = String(s.difficulty || gameDifficulty || "spicy").toUpperCase(); }
+  startEntrance();
   buildLyrics(s.song.lines, c.name || "Object");
   el.rec.classList.remove("live"); el.got.classList.remove("show"); el.judging.classList.remove("on");
   setScreen("show");
   requestAnimationFrame(() => focusLine(0));
+  if (s.demo) broadcast({ type: "song-ready", session: { id: s.id, demo: true, mode: s.mode || "duet", battle: s.battle, object: s.object, character: s.character, song: s.song, photo: "" } });
 
   try {
+    if (s.returning) { await memoryCard(s, myRun); guard(myRun); }
     await sleep(900); guard(myRun);
     await Beat.start({ genre: s.song.genre || "pop", bpm: s.song.bpm || 100, key: s.song.key || "C" });
     guard(myRun);
@@ -585,6 +729,24 @@ async function startShow(s) {
 }
 let pendingSession = null;
 
+/** OPENLOFT MEMORY FOUND: full-screen zine card for ~3s before a returning object's opener. */
+async function memoryCard(s, myRun) {
+  const m = s.memory || {}, c = s.character || {};
+  const img = $("memPhoto");
+  img.onerror = () => { img.onerror = null; img.src = s.photo || ""; };
+  img.src = m.photo || s.photo || "";
+  $("memName").textContent = `${c.name || "This one"}${s.object ? ` the ${s.object}` : ""}`;
+  const when = m.lastAt ? new Date(m.lastAt) : null;
+  const day = when && when.toDateString() === new Date().toDateString() ? "today" : when ? when.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : "";
+  $("memWhen").textContent = when ? `LAST TIME: ${day} ${when.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : "LAST TIME: we've met before";
+  $("memScore").textContent = m.lastScore != null ? `SCORE: ${Math.round(m.lastScore)}/100${m.lastWinner ? ` · WINNER: ${String(m.lastWinner).toUpperCase()}` : ""}` : (m.seen ? `MET ${m.seen} TIME${m.seen === 1 ? "" : "S"} BEFORE` : "");
+  $("memBest").textContent = m.lastBest && m.lastBest !== "silence" ? `BEST LINE: '${m.lastBest}'` : "";
+  el.memcard.classList.add("on");
+  try { window.playSfx?.("ooooh"); } catch {}
+  try { await sleep(3200); guard(myRun); } finally { el.memcard.classList.remove("on"); }
+  await sleep(350);
+}
+
 async function objectLine(i, line, myRun, c) {
   const ms = line.ms || 3500;
   wipe(i, ms);
@@ -594,12 +756,20 @@ async function objectLine(i, line, myRun, c) {
   Beat.duck(true);
   charMode.singing = true;
   try {
+    // Opener as a real rap track (ElevenLabs Music API, has its own beat): pause the Tone beat, then bring it back.
+    if (line.rapAudio && !silent) {
+      const sg = session?.song || {};
+      Beat.stop();
+      try { await playMp3(line.rapAudio, line.rapMs || ms, retimeWipe, (a) => caps.attachAudio(a)); return; }
+      catch (e) { console.warn("[stage] rap track failed, using TTS", e.message); }
+      finally { if (session?.song === sg) Beat.start({ genre: sg.genre || "pop", bpm: sg.bpm || 100, key: sg.key || "C" }); }
+    }
     if (line.audio && !silent) {
-      try { await playMp3(line.audio, ms, retimeWipe); return; } catch (e) { console.warn("[stage] line audio failed, using fallback voice", e.message); }
+      try { await playMp3(line.audio, ms, retimeWipe, (a) => caps.attachAudio(a), true); return; } catch (e) { console.warn("[stage] line audio failed, using fallback voice", e.message); }
     }
     guard(myRun);
-    await speakFallback(line.text, ms, seed);
-  } finally { Beat.duck(false); charMode.singing = false; }
+    await speakFallback(line.text, ms, seed, { start: () => caps.speechStart(), boundary: (ci) => caps.boundary(ci) });
+  } finally { caps.finish(); Beat.duck(false); charMode.singing = false; }
 }
 
 async function youLine(i, line, myRun) {
@@ -661,11 +831,7 @@ async function waitRound(r, pred, ms, myRun) {
   }
   return roundData.get(r);
 }
-function addLyric(who, text, name) {
-  const i = el.track.children.length;
-  el.track.insertAdjacentHTML("beforeend", `<div class="ln ${who === "you" ? "you" : "obj"}" data-i="${i}"><div class="who">${who === "you" ? "&#127908; You said" : esc(name)}</div><div class="txt"><span class="base">${esc(text)}</span><span class="wipe"><span class="wipe-in">${esc(text)}</span></span></div></div>`);
-  return i;
-}
+function addLyric(who, text, name) { return caps.add(who, text, name); }
 function bigCount(text) { el.count.classList.toggle("word", String(text).length > 3); el.count.textContent = text; el.count.classList.remove("go"); void el.count.offsetWidth; el.count.classList.add("go"); }
 
 async function battleRounds(s, myRun, c) {
@@ -689,7 +855,9 @@ async function battleRounds(s, myRun, c) {
     if (r >= rounds) { setPose("laugh"); await sleep(2200); guard(myRun); el.got.classList.remove("show"); setPose(null); break; }
     // Short "wait for it" beat while the comeback is written + voiced
     const t0 = performance.now();
-    const done = await waitRound(r, (d) => d.done, 16000, myRun);
+    if (!roundData.get(r)?.done) el.cooking.classList.add("on");
+    let done;
+    try { done = await waitRound(r, (d) => d.done, 16000, myRun); } finally { el.cooking.classList.remove("on"); }
     await sleep(Math.max(0, 1100 - (performance.now() - t0))); guard(myRun);
     setPose(null);
     el.got.classList.remove("show");
@@ -703,6 +871,7 @@ async function battleRounds(s, myRun, c) {
 }
 function setFac(t) { const f = $("facLabel"); if (f) f.textContent = `FAC 51 · ${t}`; } // zine catalogue label
 const pad2 = (n) => String(n).padStart(2, "0");
+let turnExtend = 0; // set by a phone mic-silent event during a live turn
 async function freestyleTurn(r, rounds, ms, myRun) {
   setFac(`ROAST BATTLE · ROUND ${pad2(r)}/${pad2(rounds)}`);
   charMode.listening = true;
@@ -712,18 +881,22 @@ async function freestyleTurn(r, rounds, ms, myRun) {
     el.got.classList.remove("show");
     el.rec.classList.add("live");
     takeWaiters.set(r, () => {}); // lets the laptop-mic fallback find the live round
-    broadcast({ type: "record-start", line: r, round: r, ms });
+    el.recTitle.textContent = "YOUR TURN";
+    broadcast({ type: "record-start", line: r, round: r, ms, ...(session?.demo ? { player: "demo" } : {}) });
     if (!phoneMicOk) laptopTake(r, ms).catch((e) => console.warn("[stage] laptop take", e));
-    const end = performance.now() + ms;
+    let end = performance.now() + ms;
+    turnExtend = 0;
     while (performance.now() < end) {
+      if (turnExtend) { end += turnExtend; turnExtend = 0; } // phone mic was silent: a few more seconds
       const left = Math.ceil((end - performance.now()) / 1000);
-      el.recState.textContent = `Round ${r} of ${rounds} · YOUR TURN, roast it back! ${left}s · ${phoneMicOk ? "phone mic" : "laptop mic"}`;
-      if (left <= 5) bigCount(String(left));
+      el.recState.textContent = `Round ${r} of ${rounds} · roast it back! · ${phoneMicOk ? "phone mic" : "laptop mic"}`;
+      if (el.turnClock.textContent !== String(left)) { el.turnClock.textContent = String(left); el.turnClock.classList.toggle("hot", left <= 5); el.turnClock.classList.remove("tick"); void el.turnClock.offsetWidth; el.turnClock.classList.add("tick"); }
+      el.turnClock.classList.add("on");
       await sleep(Math.min(1000, Math.max(50, end - performance.now() - (left - 1) * 1000)));
       guard(myRun);
     }
     bigCount("TIME!");
-  } finally { charMode.listening = false; takeWaiters.delete(r); el.rec.classList.remove("live"); }
+  } finally { charMode.listening = false; takeWaiters.delete(r); el.rec.classList.remove("live"); el.turnClock.classList.remove("on", "hot"); el.turnClock.textContent = ""; }
 }
 
 // ---------- Karaoke (secondary mode): user sings every line, object is the hype man ----------
@@ -731,6 +904,7 @@ async function karaokeLines(s, myRun) {
   const lines = s.song.lines;
   for (const n of ["3", "2", "1"]) { bigCount(n); await sleep(Math.min(700, Math.max(380, 60000 / (s.song.bpm || 100)))); guard(myRun); }
   bigCount("SING!");
+  el.recTitle.textContent = "SING IT";
   el.rec.classList.add("live");
   for (let i = 0; i < lines.length; i++) {
     guard(myRun);
@@ -775,18 +949,39 @@ async function laptopTake(line, ms) {
 const blobToBase64 = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
 
 // ---------- Judge + verdict ----------
+async function voteClosing(myRun) {
+  el.vclose.classList.add("on");
+  try {
+    for (const n of ["3", "2", "1"]) {
+      el.vcloseN.textContent = n;
+      el.vcloseN.classList.remove("go"); void el.vcloseN.offsetWidth; el.vcloseN.classList.add("go");
+      await sleep(1600); guard(myRun);
+    }
+  } finally { el.vclose.classList.remove("on"); }
+}
 async function judge(myRun) {
   Beat.stop();
+  let crowdTally = null;
+  const voting = (session.battle || session.mode === "battle") && (crowd.audienceCount() > 0 || session.pvp); // let the crowd's last votes land
+  // Real sessions: the server waits waitVotesMs, then closes voting and judges, while the stage shows VOTE CLOSING 3..2..1.
+  const judgeP = session.demo ? Promise.reject(new Error("offline demo")) : postJson("/api/judge", { id: session.id, ...(voting ? { waitVotesMs: 5000 } : {}) });
+  judgeP.catch(() => {});
+  if (voting) await voteClosing(myRun);
+  if (session.demo && voting) { try { crowdTally = (await postJson("/api/audience/close", { id: session.id })).tally || null; } catch {} }
   Beat.sting("drumroll");
   el.judging.classList.add("on");
   const started = performance.now();
   let v;
-  try { v = await postJson("/api/judge", { id: session.id }); }
+  try { v = await judgeP; }
   catch (e) {
     console.warn("[stage] judge failed, local verdict", e.message);
     const accs = [...takes.values()].map((t) => t.accuracy);
     const avg = accs.length ? accs.reduce((a, b) => a + b, 0) / accs.length : 0.5;
     v = { score: Math.round(30 + avg * 50), roast: "Is that it? Absolute melt. My kettle's got better bars than you, our kid." };
+    if (session?.demo && session.battle) {
+      v = { score: 58 + Math.round(Math.random() * 20), roast: "Hold my tea? You couldn't hold a tune. Best line was the dust one, our kid, and even that was dusty.", best: DEMO_BARS[2][0], worst: "(silence)", categories: { wit: 6, rhymes: 4, comebacks: 5, confidence: 7 } };
+      if (crowdTally?.total) { v.score = Math.max(0, Math.min(100, v.score + crowdTally.bonus)); v.crowd = { player: crowdTally.player, object: crowdTally.object, bonus: crowdTally.bonus }; }
+    }
   }
   await sleep(Math.max(0, 2200 - (performance.now() - started)));
   guard(myRun);
@@ -797,9 +992,15 @@ async function showVerdict(v, myRun) {
   const score = Math.max(0, Math.min(100, Math.round(+v.score || 0)));
   el.judging.classList.remove("on");
   el.roast.textContent = "";
-  const cat = v.categories && typeof v.categories === "object" ? Object.entries(v.categories).map(([k, n]) => `<span class="cat"><b>${esc(k[0].toUpperCase() + k.slice(1))}</b> ${Math.round(+n || 0)}/10</span>`) : [];
+  // Rubric categories with their one-line reason ("Rhymes 6/10 - 3 rhyming pairs: mug/thug...")
+  const why = v.reasons && typeof v.reasons === "object" ? v.reasons : {};
+  const cat = v.categories && typeof v.categories === "object" ? Object.entries(v.categories).map(([k, n]) => `<span class="cat"><b>${esc(k[0].toUpperCase() + k.slice(1))}</b> ${Math.round(+n || 0)}/10${why[k] ? `<small class="why"> — ${esc(why[k])}</small>` : ""}</span>`) : [];
   el.bw.innerHTML = [...cat, v.best && `<span>Best: ${esc(v.best)}</span>`, v.worst && `<span>Worst: ${esc(v.worst)}</span>`].filter(Boolean).join("");
   el.scoreNum.textContent = "0";
+  const battleish = session?.battle || session?.mode === "battle" || v.mode === "battle";
+  el.winner.textContent = v.pvp?.winnerName ? `WINNER: ${v.pvp.winnerName}` : battleish ? (score >= 60 ? "WINNER: YOU" : `WINNER: THE ${String(session?.object || session?.character?.name || "object").toUpperCase()}`) : (score >= 70 ? "PROPER SINGER" : "BRAVE EFFORT");
+  el.winner.classList.toggle("you", !!battleish && score >= 60);
+  if (session?.demo) broadcast({ type: "verdict", score, roast: v.roast || "", best: v.best, worst: v.worst, categories: v.categories, crowd: v.crowd });
   charMode.verdict = score >= 80 ? "celebrate" : score < 40 ? "facepalm" : "laugh";
   charMode.verdictAt = performance.now();
   setScreen("result");
@@ -842,8 +1043,9 @@ function typeText(node, text, ms) {
 // ---------- Confetti (canvas) ----------
 const cv = el.confetti, cx = cv.getContext("2d");
 let parts = [], confRaf = 0;
-function sizeCanvas() { const d = Math.min(2, devicePixelRatio || 1); cv.width = innerWidth * d; cv.height = innerHeight * d; cx.setTransform(d, 0, 0, d, 0, 0); }
-addEventListener("resize", () => { sizeCanvas(); if (session && state === "show") focusLine([...el.track.children].findIndex((r) => r.classList.contains("current"))); });
+const CW = 1920, CH = 1080; // design canvas (index.html scales it to the window)
+function sizeCanvas() { const d = Math.min(2, (devicePixelRatio || 1) * (window.stageScale || 1)); cv.width = CW * d; cv.height = CH * d; cx.setTransform(d, 0, 0, d, 0, 0); }
+addEventListener("resize", () => sizeCanvas());
 sizeCanvas();
 function burstConfetti(n) {
   const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
@@ -851,7 +1053,7 @@ function burstConfetti(n) {
   for (let i = 0; i < n; i++) {
     const fromLeft = i % 2 === 0;
     parts.push({
-      x: fromLeft ? -10 : innerWidth + 10, y: innerHeight * (0.55 + Math.random() * 0.3),
+      x: fromLeft ? -10 : CW + 10, y: CH * (0.55 + Math.random() * 0.3),
       vx: (fromLeft ? 1 : -1) * (6 + Math.random() * 10), vy: -(12 + Math.random() * 12),
       w: 6 + Math.random() * 8, h: 10 + Math.random() * 12, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4,
       c: colours[(Math.random() * colours.length) | 0], life: 0,
@@ -860,15 +1062,15 @@ function burstConfetti(n) {
   if (!confRaf) confRaf = requestAnimationFrame(tickConfetti);
 }
 function tickConfetti() {
-  cx.clearRect(0, 0, innerWidth, innerHeight);
-  parts = parts.filter((p) => p.y < innerHeight + 40 && p.life < 600);
+  cx.clearRect(0, 0, CW, CH);
+  parts = parts.filter((p) => p.y < CH + 40 && p.life < 600);
   for (const p of parts) {
     p.life++; p.vy += 0.35; p.vx *= 0.985; p.vy *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
     cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r); cx.scale(1, Math.cos(p.life * 0.12));
     cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); cx.restore();
   }
   confRaf = parts.length ? requestAnimationFrame(tickConfetti) : 0;
-  if (!confRaf) cx.clearRect(0, 0, innerWidth, innerHeight);
+  if (!confRaf) cx.clearRect(0, 0, CW, CH);
 }
 function stopConfetti() { parts = []; }
 
@@ -891,6 +1093,9 @@ onPhone((ev) => {
     case "mode":
       setModeUi(ev.mode);
       break;
+    case "difficulty":
+      setDifficultyUi(ev.difficulty);
+      break;
     case "mic-unavailable":
       if (phoneMicOk) {
         phoneMicOk = false;
@@ -903,18 +1108,32 @@ onPhone((ev) => {
         }
       }
       break;
+    case "mic-silent": // phone mic hears nothing even after re-grabbing it
+      if (el.rec.classList.contains("live")) turnExtend = Math.min(4000, Math.max(0, Number(ev.extendMs) || 3000));
+      toast(`CAN'T HEAR ${ev.playerName ? String(ev.playerName).toUpperCase() : "THE RAPPER"} — check the phone mic`);
+      break;
+    case "mic-check": // phone ran TEST MIC
+      toast(`${ev.playerName || "Phone"}: mic ${ev.ok ? "OK ✓" : "not hearing anything ✗"}`);
+      break;
     case "reset":
+      if (performance.now() - ownResetAt < 1500) break; // our own Esc/Again echo: never kill a show started right after
       if (state !== "idle") goIdle();
+      el.idleCta.classList.remove("waking"); el.idleCtaText.textContent = "Snap anything to start";
       break;
     case "error":
+      if (state !== "idle") goIdle();
       el.idleCta.classList.remove("waking"); el.idleCtaText.textContent = "Snap anything to start";
-      toast(ev.message || "That one didn't wake up - try another snap");
+      toast("SNAP FAILED — TRY AGAIN", 4200);
+      break;
+    case "public-url":
+      loadIdle();
       break;
   }
 });
 
 // ---------- Controls ----------
-function again() { broadcast({ type: "reset" }); goIdle(); }
+let ownResetAt = -1e9;
+function again() { ownResetAt = performance.now(); broadcast({ type: "reset" }); goIdle(); }
 el.againBtn.addEventListener("click", again);
 addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
@@ -926,12 +1145,41 @@ addEventListener("keydown", (e) => {
     if (!unlocked) unlock().then(() => startShow(demoSession())); else if (state === "idle") startShow(demoSession());
   } else if (e.key === "b" || e.key === "B") {
     if (!unlocked) unlock().then(() => startShow(demoBattle())); else if (state === "idle") startShow(demoBattle());
+  } else if (["1", "2", "3"].includes(e.key) && state === "idle") {
+    setDifficulty(DIFFS[+e.key - 1]);
   } else if ((e.key === "m" || e.key === "M") && state === "idle") {
     setMode(gameMode === "battle" ? "karaoke" : "battle");
   } else if (e.key === "Escape") {
-    goIdle();
+    hardReset();
+  } else if (e.key === "h" || e.key === "H" || e.key === "?") {
+    el.help.classList.toggle("on");
+  } else if (e.key === "q" || e.key === "Q") {
+    document.body.classList.toggle("show-mic");
+  } else if (e.key === "n" || e.key === "N") {
+    nextPlayer();
   }
 });
+/** Esc: always back to idle, close every overlay, and tell the phones to reset too. */
+function hardReset() {
+  el.help.classList.remove("on");
+  ownResetAt = performance.now();
+  broadcast({ type: "reset", reason: "stage-esc" });
+  goIdle();
+  el.idleCta.classList.remove("waking"); el.idleCtaText.textContent = "Snap anything to start";
+}
+/** N: next player - reset + rotate the VS THE OBJECT queue (lib/players.mjs via /api/match). */
+async function nextPlayer() {
+  hardReset();
+  try {
+    const r = await (await fetch("/api/players")).json();
+    const list = r.players || [];
+    if (r.match?.type === "pvp" || list.length < 2) { toast(list.length ? "Next up!" : "Reset - next player, snap away"); return; }
+    const i = list.findIndex((p) => p.id === r.match?.current);
+    const next = list[(i + 1) % list.length];
+    await postJson("/api/match", { type: "object", current: next.id });
+    toast(`Next up: ${next.name}`);
+  } catch { toast("Reset - next player, snap away"); }
+}
 // Gate unlock replays a song that arrived before the click
 el.gateBtn.addEventListener("click", () => { if (pendingSession) { const s = pendingSession; pendingSession = null; setTimeout(() => startShow(s), 300); } });
 
@@ -963,7 +1211,7 @@ const demoTakes = new Map();
 /** Offline battle demo (key B): canned freestyles + comebacks, browser voice. */
 function demoBattle() {
   const d = demoSession();
-  d.mode = "battle"; d.battle = { rounds: 3, youMs: 6000 };
+  d.mode = "battle"; d.battle = { ...demoCfg };
   d.song = { title: "Brew Beef", genre: "hip hop", bpm: 92, key: "C", lines: [{ who: "object", text: "Look at you, our kid, stood there like a muppet. I've held better bars in me since 1996. Go on then, you melt.", ms: 6000 }] };
   return d;
 }
@@ -978,7 +1226,17 @@ setInterval(() => {
     if (roundData.get(r)?.pending) continue;
     setRound(r, { pending: true });
     const [said, cb] = DEMO_BARS[(r - 1) % DEMO_BARS.length];
-    setTimeout(() => { setRound(r, { transcript: said, heard: true }); setTimeout(() => setRound(r, { done: true, comeback: cb ? { text: cb } : null }), 900); }, session.battle.youMs + 300);
+    const sid = session.id;
+    setTimeout(() => {
+      if (session?.id !== sid) return;
+      setRound(r, { transcript: said, heard: true });
+      broadcast({ type: "take-heard", round: r, line: r, transcript: said });
+      setTimeout(() => {
+        if (session?.id !== sid) return;
+        setRound(r, { done: true, comeback: cb ? { text: cb } : null });
+        broadcast({ type: "take-received", round: r, line: r, transcript: said, comeback: cb ? { text: cb } : null, last: r >= session.battle.rounds });
+      }, 2200);
+    }, session.battle.youMs + 300);
   }
 }, 200);
 
@@ -995,14 +1253,34 @@ function setModeUi(m) {
   }
   modeBtn.innerHTML = gameMode === "battle" ? "Mode: <b>ROAST BATTLE</b> · M for Karaoke" : "Mode: <b>KARAOKE</b> · M for Roast Battle";
 }
+// ---------- Difficulty (mild | spicy default | savage), server-side like the mode ----------
+const DIFFS = ["mild", "spicy", "savage"];
+const DIFF_LABEL = { mild: ["Mild", "Light roast"], spicy: ["Spicy", "Cheeky bars"], savage: ["Savage", "No mercy"] };
+let gameDifficulty = "spicy", diffSeg = null;
+function setDifficultyUi(d) {
+  gameDifficulty = DIFFS.includes(d) ? d : "spicy";
+  if (!diffSeg) {
+    diffSeg = document.createElement("div");
+    diffSeg.className = "diff-seg";
+    diffSeg.setAttribute("role", "radiogroup");
+    diffSeg.innerHTML = DIFFS.map((k, i) => `<button type="button" role="radio" data-d="${k}"><kbd>${i + 1}</kbd>${DIFF_LABEL[k][0]}<small>${DIFF_LABEL[k][1]}</small></button>`).join("");
+    diffSeg.addEventListener("click", (e) => { const b = e.target.closest("button[data-d]"); if (b) { e.stopPropagation(); setDifficulty(b.dataset.d); } });
+    if (modeBtn?.parentElement) modeBtn.after(diffSeg); else (el.idleCta?.parentElement || document.body).appendChild(diffSeg);
+  }
+  for (const b of diffSeg.querySelectorAll("button")) { const on = b.dataset.d === gameDifficulty; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }
+}
+async function setDifficulty(d) {
+  setDifficultyUi(d);
+  try { const r = await postJson("/api/difficulty", { difficulty: d }); setDifficultyUi(r.difficulty); } catch { toast("Couldn't change difficulty"); }
+}
 async function setMode(m) {
   setModeUi(m);
   try { const r = await postJson("/api/mode", { mode: m }); setModeUi(r.mode); } catch { toast("Couldn't change mode"); }
 }
-status().then((st) => setModeUi(st?.mode)).catch(() => setModeUi("battle"));
+status().then((st) => { rememberStatus(st); setModeUi(st?.mode); setDifficultyUi(st?.difficulty); }).catch(() => { setModeUi("battle"); setDifficultyUi("spicy"); });
 // In demo mode, answer our own record-start after the line finishes
 setInterval(() => {
-  if (!session?.demo) return;
+  if (!session?.demo || session.battle) return; // the battle demo has its own canned bars (DEMO_BARS)
   for (const [line, resolve] of takeWaiters) {
     const t = demoTakes.get(line);
     const ms = session.song.lines[line]?.ms || 3000;

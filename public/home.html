@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ece6d6">
+<title>Duet Anything</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { --paper:#ece6d6; --ink:#111; --pink:#ff4f9a; --yellow:#ffd400; --grey:#8a8478; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); font-family:"Space Mono", monospace; overflow-y:auto; }
+  body { display:flex; flex-direction:column; min-height:100vh; min-height:100dvh; overflow-x:clip; }
+  .hazard { height:30px; flex:0 0 auto; background:repeating-linear-gradient(-45deg,#111 0 18px,#ffd400 18px 36px); border-bottom:4px solid var(--ink); }
+  .hazard.b { border-bottom:0; border-top:4px solid var(--ink); }
+  header { display:flex; justify-content:space-between; padding:12px 16px 0; font-size:13px; font-weight:700; text-transform:uppercase; }
+  .logo { font-family:"Rubik Mono One", monospace; font-size:14px; }
+  main { flex:1; display:flex; flex-direction:column; justify-content:center; gap:26px; padding:20px 16px 30px; width:100%; max-width:1100px; margin:0 auto; }
+  h1 { font-family:"Anton", sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(56px, 16vw, 150px); line-height:.9; margin:0; }
+  h1 .hl { background:var(--pink); padding:2px 8px 0; display:inline-block; line-height:1.02; margin-top:8px; }
+  .tag { margin-top:14px !important; }
+  .tag { margin:0; font-weight:700; text-transform:uppercase; font-size:clamp(13px, 3.4vw, 18px); }
+  .choices { display:grid; grid-template-columns:minmax(0,1fr); gap:22px; }
+  @media (min-width:760px) { .choices { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:34px; } }
+  .choice { display:flex; flex-direction:column; gap:6px; text-decoration:none; color:var(--ink); border:6px solid var(--ink); box-shadow:10px 10px 0 var(--ink); padding:22px 20px; transition:transform .12s ease, box-shadow .12s ease; }
+  .choice:active { transform:translate(8px,8px); box-shadow:2px 2px 0 var(--ink); }
+  .choice b { font-family:"Anton", sans-serif; font-weight:400; font-size:clamp(64px, 19vw, 120px); line-height:.9; text-transform:uppercase; }
+  .choice span { font-weight:700; text-transform:uppercase; font-size:14px; }
+  .choice.host { background:var(--yellow); transform:rotate(-1.2deg); }
+  .choice.player { background:var(--pink); transform:rotate(1.2deg); }
+  .choice.rec::after { content:"This laptop? Pick HOST"; align-self:flex-start; margin-top:6px; background:var(--ink); color:var(--yellow); font-size:12px; font-weight:700; padding:2px 6px; text-transform:uppercase; }
+  .choice.player.rec::after { content:"On your phone? Pick PLAYER"; }
+</style>
+</head>
+<body>
+  <div class="hazard"></div>
+  <header><span class="logo">DUET ANYTHING</span><span>Hack Day Manchester</span></header>
+  <main>
+    <div>
+      <h1>Duet<br><span class="hl">Anything.</span></h1>
+      <p class="tag">Snap any object. It roasts you. Battle your mates.</p>
+    </div>
+    <div class="choices">
+      <a class="choice host" id="host" href="/stage"><b>Host</b><span>Run the big screen (laptop / projector)</span></a>
+      <a class="choice player" id="player" href="/play"><b>Player</b><span>Battle on the mic, or judge from the crowd</span></a>
+    </div>
+  </main>
+  <div class="hazard b"></div>
+  <script>
+    // Hint the likely choice: laptop = HOST, phone = PLAYER. Carry ?code= through to /play.
+    const phone = matchMedia("(pointer:coarse)").matches && Math.min(screen.width, screen.height) < 820;
+    document.getElementById(phone ? "player" : "host").classList.add("rec");
+    const code = new URLSearchParams(location.search).get("code");
+    if (code) document.getElementById("player").href = "/play?code=" + encodeURIComponent(code);
+  </script>
+</body>
+</html>

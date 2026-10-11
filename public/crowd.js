@@ -107,6 +107,7 @@ export function renderGallery(row, countEl) {
 }
 
 // ---------- Karaoke crowd ----------
+const REACT_WORD = { cheer: "WOO!", boo: "BOO!", fire: "FIRE!", laugh: "HAHA!" }; // real phone reactions: "DEBS: FIRE!"
 const BUBBLES = { cheer: ["woo!", "get in!", "tune!", "mint!", "go on!", "proper!", "encore!", "buzzin'!"], boo: ["boo!", "ouch", "nah mate", "my ears!", "oof"], laugh: ["haha!", "savage!", "ooooh!", "roasted!"], fire: ["FIRE!", "scorcher!", "heat!", "too hot!"] };
 /** Audience phone member -> crowd character: their picked placeholder art, their name + colour. */
 function audienceChar(a) {
@@ -127,7 +128,7 @@ export function createCrowd(host) {
   /** Phone reaction: bubble over that member (or a random one if they're off-screen) + a little energy burst. */
   function react(id, type) {
     const m = members.find((x) => x.c.id === id) || members[(Math.random() * members.length) | 0];
-    if (m) bubble(m, type, performance.now());
+    if (m) bubble(m, type, performance.now(), m.c.audience && m.c.id === id ? `${m.c.name}: ${REACT_WORD[type] || "WOO!"}` : null);
     if (type !== "boo") burst = Math.min(1, burst + 0.35);
   }
   function setMembers(list) {
@@ -142,12 +143,13 @@ export function createCrowd(host) {
       return { n, c, d: Math.random() * 0.6, wob: Math.random() * 6.28, arm: 20, armR: 20, px: 0, py: 1, vx: 0, vy: 0, bubbleUntil: 0, i };
     });
   }
-  function bubble(m, mood, now) {
+  function bubble(m, mood, now, text) {
     const b = m.n.querySelector(".cm-bubble");
     const set = BUBBLES[mood] || BUBBLES.cheer;
-    b.textContent = set[(Math.random() * set.length) | 0];
+    b.textContent = text || set[(Math.random() * set.length) | 0];
+    b.classList.toggle("real", !!text);
     b.classList.add("on");
-    m.bubbleUntil = now + 1300;
+    m.bubbleUntil = now + (text ? 2200 : 1300);
   }
   /** ctx: { now, dt, beat (beats, or null), pulse, excite 0-1, mood: null|'cheer'|'laugh'|'boo', visible } */
   function tick(ctx) {
@@ -190,7 +192,7 @@ export function createCrowd(host) {
       }
       if (m.bubbleUntil && now > m.bubbleUntil) { m.bubbleUntil = 0; m.n.querySelector(".cm-bubble").classList.remove("on"); }
     }
-    if (now > nextBubble) { // random "woo!" pops, more often when it's lively
+    if (now > nextBubble && !audience.size) { // random "woo!" pops (only while no real phones are in the crowd)
       const m = members[(Math.random() * members.length) | 0];
       if (!m.bubbleUntil) bubble(m, mood || "cheer", now);
       nextBubble = now + (mood ? 500 : 1800 - excite * 1200) + Math.random() * 900;
