@@ -107,6 +107,7 @@ es.onmessage = (m) => {
       break;
     case "audience-react":
       window.crowd?.react?.(ev.id, ev.reaction);
+      { const now = performance.now(); if (now - (window.__lastCrowdSfx || 0) > 900) { window.__lastCrowdSfx = now; window.playSfx?.({ cheer: "cheer", fire: "airhorn", laugh: "laugh", boo: "boo" }[ev.reaction] || "cheer"); } } // crowd phones -> room sound
       if (ev.reaction === "cheer" || ev.reaction === "fire") window.crowd?.cheer?.();
       energy = Math.min(1, energy + (BUMP[ev.reaction] || 0.08));
       $("audFeed").textContent = `${ev.name} ${WORD[ev.reaction] || ""}`;

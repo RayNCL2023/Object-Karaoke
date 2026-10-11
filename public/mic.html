@@ -148,10 +148,15 @@
   @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
   .judgeOut { align-self:center; margin-top:6px; padding:10px 16px; background:#fff; color:#111; border:3px solid #111; box-shadow:4px 4px 0 #111; font-weight:700; text-decoration:none; }
   .judgeOut.big { background:var(--yellow); font-size:20px; }
+
+/* dissPICable wordmark (Claude Design "Zine Remix"): Anton, PIC = tilted yellow print with a pink offset shadow */
+.wm, .wmk { font-family: "Anton", Impact, sans-serif !important; text-transform: none !important; letter-spacing: -0.01em; white-space: nowrap; }
+.wm .pic, .wmk .pic { display: inline-block; background: #ffd400; color: #111; border: 6px solid #111; padding: 0 0.12em 0.04em; margin: 0 0.06em; transform: rotate(-4deg); box-shadow: 0.08em 0.08em 0 #ff4f9a; font-weight: 400; }
+.wmk .pic { border-width: 2px; box-shadow: 3px 3px 0 #ff4f9a; }
 </style>
 </head>
 <body>
-<header><span><span id="dot"></span><b>dissPICable</b></span><span><span id="hdrRight">mic</span><span data-mic-chip></span></span></header>
+<header><span><span id="dot"></span><b class="wmk">diss<b class="pic">PIC</b>able</b></span><span><span id="hdrRight">mic</span><span data-mic-chip></span></span></header>
 <main>
   <!-- 1. Snap -->
   <section class="screen show" id="snapScreen">

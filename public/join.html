@@ -64,11 +64,16 @@
   .vote button.on { background:var(--ink); color:var(--yellow); }
   .vote .tally { font-size:13px; font-weight:700; text-transform:uppercase; }
   .leave { background:none; border:0; font:700 13px "Space Mono", monospace; text-decoration:underline; color:var(--grey); align-self:center; cursor:pointer; text-transform:uppercase; }
+
+/* dissPICable wordmark (Claude Design "Zine Remix"): Anton, PIC = tilted yellow print with a pink offset shadow */
+.wm, .wmk { font-family: "Anton", Impact, sans-serif !important; text-transform: none !important; letter-spacing: -0.01em; white-space: nowrap; }
+.wm .pic, .wmk .pic { display: inline-block; background: #ffd400; color: #111; border: 6px solid #111; padding: 0 0.12em 0.04em; margin: 0 0.06em; transform: rotate(-4deg); box-shadow: 0.08em 0.08em 0 #ff4f9a; font-weight: 400; }
+.wmk .pic { border-width: 2px; box-shadow: 3px 3px 0 #ff4f9a; }
 </style>
 </head>
 <body>
   <div class="hazard"></div>
-  <header><span class="logo">dissPICable</span><span><i id="dot"></i><span id="roomTag">CROWD</span></span></header>
+  <header><span class="logo wmk">diss<b class="pic">PIC</b>able</span><span><i id="dot"></i><span id="roomTag">CROWD</span></span></header>
   <main>
     <section class="screen show" id="joinScreen">
       <h1>Join the<br><span class="hl">crowd.</span></h1>

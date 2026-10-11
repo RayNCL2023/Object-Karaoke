@@ -35,11 +35,16 @@
   .err { min-height:1.4em; font-weight:700; color:var(--ink); background:var(--yellow); padding:0 4px; align-self:flex-start; margin:0; }
   .err:empty { background:none; }
   .note { font-size:12px; color:var(--grey); text-transform:uppercase; font-weight:700; margin:0; }
+
+/* dissPICable wordmark (Claude Design "Zine Remix"): Anton, PIC = tilted yellow print with a pink offset shadow */
+.wm, .wmk { font-family: "Anton", Impact, sans-serif !important; text-transform: none !important; letter-spacing: -0.01em; white-space: nowrap; }
+.wm .pic, .wmk .pic { display: inline-block; background: #ffd400; color: #111; border: 6px solid #111; padding: 0 0.12em 0.04em; margin: 0 0.06em; transform: rotate(-4deg); box-shadow: 0.08em 0.08em 0 #ff4f9a; font-weight: 400; }
+.wmk .pic { border-width: 2px; box-shadow: 3px 3px 0 #ff4f9a; }
 </style>
 </head>
 <body>
   <div class="hazard"></div>
-  <header><span class="logo">dissPICable</span><a href="/">Home</a></header>
+  <header><span class="logo wmk">diss<b class="pic">PIC</b>able</span><a href="/">Home</a></header>
   <main>
     <h1>You're<br><span class="hl">in.</span></h1>
     <div><label for="code">Room code (on the big screen)</label><input id="code" type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="MANC"></div>

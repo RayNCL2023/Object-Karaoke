@@ -919,7 +919,7 @@ async function freestyleTurn(r, rounds, ms, myRun) {
       await sleep(Math.min(1000, Math.max(50, end - performance.now() - (left - 1) * 1000)));
       guard(myRun);
     }
-    bigCount("TIME!");
+    bigCount("TIME!"); window.playSfx?.(Math.random() < 0.5 ? "cheer" : "ooooh"); // crowd reacts to your bars
   } finally { charMode.listening = false; takeWaiters.delete(r); el.rec.classList.remove("live"); el.turnClock.classList.remove("on", "hot"); el.turnClock.textContent = ""; }
 }
 
@@ -989,7 +989,7 @@ const blobToBase64 = (blob) => new Promise((res, rej) => { const r = new FileRea
 
 // ---------- Judge + verdict ----------
 async function voteClosing(myRun) {
-  el.vclose.classList.add("on");
+  el.vclose.classList.add("on"); window.playSfx?.("drumroll");
   try {
     for (const n of ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]) {
       el.vcloseN.textContent = n;

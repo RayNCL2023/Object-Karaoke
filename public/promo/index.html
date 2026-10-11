@@ -177,7 +177,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #111; }
 
 <div id="stage">
   <div class="tape top"></div><div class="tape bot"></div>
-  <div class="brand"><b>DUET</b> ANYTHING</div>
+  <div class="brand wmk">diss<b class="pic">PIC</b>able</div>
   <div class="fac">FAC 51 &middot; HACK DAY MCR</div>
   <div class="progress" id="prog"></div>
 
@@ -279,7 +279,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #111; }
   <!-- 9 End card -->
   <section class="scene" id="s9">
     <div class="marq">Snap anything &#9733; battle it &#9733; our kid &#9733; absolute weapon &#9733; Snap anything &#9733; battle it &#9733; our kid &#9733; absolute weapon &#9733; Snap anything &#9733; battle it &#9733; our kid &#9733; absolute weapon &#9733; Snap anything &#9733; battle it &#9733; our kid &#9733; absolute weapon &#9733;</div>
-    <div class="logo"><span class="pop">dissPICable</span></div>
+    <div class="logo"><span class="pop wm">diss<b class="pic">PIC</b>able</span></div>
     <div class="tagline pop d1">snap anything, then battle it.</div>
     <div class="repo pop d2"><b>tinyurl.com/duetanything-repo</b></div>
     <div class="char cool talking slot pop d3"></div>
@@ -433,3 +433,9 @@ if (new URLSearchParams(location.search).has("auto")) start();
 <style>.shades, .chain { display: none !important; }</style>
 <style>.brand, #s9 .logo, #s9 .logo span { text-transform: none !important; }</style>
 <script>addEventListener("keydown", function (e) { if (e.key === "Escape" && window.parent !== window) window.parent.postMessage("promo-close", "*"); });</script>
+<style>
+/* dissPICable wordmark (Claude Design "Zine Remix"): Anton, PIC = tilted yellow print with a pink offset shadow */
+.wm, .wmk { font-family: "Anton", Impact, sans-serif !important; text-transform: none !important; letter-spacing: -0.01em; white-space: nowrap; }
+.wm .pic, .wmk .pic { display: inline-block; background: #ffd400; color: #111; border: 6px solid #111; padding: 0 0.12em 0.04em; margin: 0 0.06em; transform: rotate(-4deg); box-shadow: 0.08em 0.08em 0 #ff4f9a; font-weight: 400; }
+.wmk .pic { border-width: 2px; box-shadow: 3px 3px 0 #ff4f9a; }
+#s9 .logo .wm { background: none !important; color: var(--paper); padding: 0; } #s9 .logo .pic { border-width: 8px; }</style>

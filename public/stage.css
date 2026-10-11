@@ -665,3 +665,10 @@ body:not([data-screen="idle"]) .trailer-btn { display: none; }
 /* Rubik Mono One is caps-only: the name uses Anton so "diss" + "PIC" + "able" keep their casing */
 .idle .title .t1, .idle .title .t2 { font-family: var(--anton) !important; letter-spacing: 0.01em; }
 .trailer-btn { left: 680px; top: 86px; padding: 8px 14px; font-size: 16px; box-shadow: 4px 4px 0 #111; }
+
+/* dissPICable wordmark (Claude Design "Zine Remix"): Anton, PIC = tilted yellow print with a pink offset shadow */
+.wm, .wmk { font-family: "Anton", Impact, sans-serif !important; text-transform: none !important; letter-spacing: -0.01em; white-space: nowrap; }
+.wm .pic, .wmk .pic { display: inline-block; background: #ffd400; color: #111; border: 6px solid #111; padding: 0 0.12em 0.04em; margin: 0 0.06em; transform: rotate(-4deg); box-shadow: 0.08em 0.08em 0 #ff4f9a; font-weight: 400; }
+.wmk .pic { border-width: 2px; box-shadow: 3px 3px 0 #ff4f9a; }
+.idle .title { display: block; } .idle .title .wm { display: inline-block; font-size: 170px; line-height: 1; color: #111; background: none !important; }
+.logo-sm .pic { border-width: 3px; box-shadow: 4px 4px 0 #ff4f9a; }
