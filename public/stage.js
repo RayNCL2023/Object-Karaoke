@@ -932,7 +932,7 @@ async function battleRounds(s, myRun, c) {
 }
 function setFac(t) { const f = $("facLabel"); if (f) f.textContent = `FAC 51 · ${t}`; } // zine catalogue label
 const pad2 = (n) => String(n).padStart(2, "0");
-let turnExtend = 0; // set by a phone mic-silent event during a live turn
+let turnExtend = 0, verseDone = false; // verseDone: the rapper tapped END MY VERSE on their phone // set by a phone mic-silent event during a live turn
 async function freestyleTurn(r, rounds, ms, myRun) {
   setFac(`ROAST BATTLE · ROUND ${pad2(r)}/${pad2(rounds)}`);
   charMode.listening = true;
@@ -947,8 +947,9 @@ async function freestyleTurn(r, rounds, ms, myRun) {
     el.recTitle.textContent = "YOUR TURN";
     if (!phoneMicOk) laptopTake(r, ms).catch((e) => console.warn("[stage] laptop take", e));
     let end = performance.now() + ms;
-    turnExtend = 0;
+    turnExtend = 0; verseDone = false;
     while (performance.now() < end) {
+      if (verseDone) { verseDone = false; break; }
       if (turnExtend) { end += turnExtend; turnExtend = 0; } // phone mic was silent: a few more seconds
       const left = Math.ceil((end - performance.now()) / 1000);
       el.recState.textContent = `Round ${r} of ${rounds} · roast it back! · ${phoneMicOk ? "phone mic" : "laptop mic"}`;
@@ -1186,6 +1187,7 @@ onPhone((ev) => {
         }
       }
       break;
+    case "verse-done": if (charMode.listening) verseDone = true; break;
     case "mic-silent": // phone mic hears nothing even after re-grabbing it
       if (el.rec.classList.contains("live")) turnExtend = Math.min(4000, Math.max(0, Number(ev.extendMs) || 3000));
       toast(`CAN'T HEAR ${ev.playerName ? String(ev.playerName).toUpperCase() : "THE RAPPER"} — check the phone mic`);

@@ -153,6 +153,8 @@
 .wm, .wmk { font-family: "Anton", Impact, sans-serif !important; text-transform: none !important; letter-spacing: -0.01em; white-space: nowrap; }
 .wm .pic, .wmk .pic { display: inline-block; background: #ffd400; color: #111; border: 6px solid #111; padding: 0 0.12em 0.04em; margin: 0 0.06em; transform: rotate(-4deg); box-shadow: 0.08em 0.08em 0 #ff4f9a; font-weight: 400; }
 .wmk .pic { border-width: 2px; box-shadow: 3px 3px 0 #ff4f9a; }
+  /* End my verse: big thumb button along the bottom of the mic screen */
+  #recScreen .stop { top:auto; bottom:18px; left:16px; right:16px; padding:16px 12px; font:400 26px/1 var(--anton, Impact, sans-serif); letter-spacing:.02em; background:#ffd400; box-shadow:5px 5px 0 #111; }
 </style>
 </head>
 <body>
@@ -221,7 +223,7 @@
         <div class="timer"><b id="timer"></b></div>
       </div>
     </div>
-    <button class="stop" id="stopBtn" type="button">Stop</button>
+    <button class="stop" id="stopBtn" type="button">End my verse &#10003;</button>
   </section>
 
   <!-- 3b. Sent / waiting: same mic, switched off -->

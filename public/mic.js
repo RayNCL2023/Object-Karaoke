@@ -384,7 +384,8 @@ async function onRecordStart(ev) {
     if (battle && state.screen === "sentScreen") $("sentText").textContent = "Couldn't send that one - carry on!";
   }
 }
-$("stopBtn")?.addEventListener("click", () => { if (state.stopTake) state.stopTake(); else if (state.rec && state.rec.state !== "inactive") state.rec.stop(); });
+$("stopBtn")?.addEventListener("click", () => {
+  broadcast({ type: "verse-done", client: CLIENT, player: player?.id, id: state.id }); /* stage ends the turn now */ if (state.stopTake) state.stopTake(); else if (state.rec && state.rec.state !== "inactive") state.rec.stop(); });
 const SILENT_LEVEL = 0.03; // meter level (RMS x4) below this the whole time = we hear nothing
 /** Supported recording type: iPhone = audio/mp4, everyone else = webm/opus. */
 function pickMime() {
