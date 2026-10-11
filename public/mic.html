@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0b10">
+<title>Duet Anything - Mic</title>
+<style>
+  :root { --bg:#0b0b10; --fg:#fff; --dim:#9a9aae; --accent:#ff5a36; --ok:#3ddc84; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
+  body { display:flex; flex-direction:column; }
+  header { padding:14px 18px 0; display:flex; justify-content:space-between; align-items:center;
+    font-weight:800; letter-spacing:.02em; font-size:15px; color:var(--dim); }
+  header b { color:var(--fg); }
+  #dot { width:10px; height:10px; border-radius:50%; background:#555; display:inline-block; margin-right:6px; transition:background .3s; }
+  #dot.on { background:var(--ok); }
+  main { flex:1; position:relative; }
+  .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom)); text-align:center; gap:22px;
+    opacity:0; transform:translateY(16px) scale(.98); pointer-events:none;
+    transition:opacity .35s ease, transform .45s cubic-bezier(.2,.8,.2,1); }
+  .screen.show { opacity:1; transform:none; pointer-events:auto; }
+  h1 { font-size:clamp(34px, 10vw, 60px); line-height:1.02; margin:0; font-weight:900; }
+  h2 { font-size:clamp(22px, 6.5vw, 34px); margin:0; font-weight:800; line-height:1.1; }
+  p { margin:0; font-size:20px; color:var(--dim); line-height:1.35; max-width:30ch; }
+  .big { width:min(78vw, 340px); aspect-ratio:1; border-radius:50%; border:0; background:var(--accent); color:#fff;
+    font-size:clamp(40px, 13vw, 64px); font-weight:900; box-shadow:0 0 0 10px rgba(255,255,255,.06), 0 20px 60px rgba(0,0,0,.6);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; cursor:pointer;
+    transition:transform .15s ease; animation:breathe 2.6s ease-in-out infinite; }
+  .big small { font-size:18px; font-weight:700; opacity:.85; }
+  .big:active { transform:scale(.95); }
+  .pill { border:0; border-radius:999px; padding:22px 34px; font-size:24px; font-weight:900; background:var(--fg); color:#000;
+    width:min(86vw, 380px); cursor:pointer; transition:transform .15s; }
+  .pill:active { transform:scale(.96); }
+  @keyframes breathe { 50% { transform:scale(1.04); } }
+  input[type=file] { display:none; }
+
+  /* waking */
+  .blob { width:150px; height:150px; border-radius:46% 54% 50% 50%; background:var(--accent); position:relative;
+    animation:wobble 1.4s ease-in-out infinite; }
+  .blob::before, .blob::after { content:""; position:absolute; top:52px; width:22px; height:22px; border-radius:50%; background:#fff;
+    animation:blink 2.2s infinite; }
+  .blob::before { left:38px; } .blob::after { right:38px; }
+  .blob i { position:absolute; left:50%; bottom:34px; width:40px; height:14px; margin-left:-20px; border-radius:0 0 20px 20px; background:#2a0b05;
+    animation:yawn 1.4s ease-in-out infinite; }
+  @keyframes wobble { 0%,100% { transform:rotate(-6deg) translateY(0); } 50% { transform:rotate(6deg) translateY(-14px); } }
+  @keyframes blink { 0%,90%,100% { transform:scaleY(1); } 95% { transform:scaleY(.1); } }
+  @keyframes yawn { 50% { transform:scaleY(1.9); } }
+  #quip { min-height:2.8em; font-size:24px; color:var(--fg); font-weight:700; transition:opacity .3s; }
+  .thumb { width:96px; height:96px; border-radius:50%; object-fit:cover; border:4px solid var(--accent); }
+
+  /* ready */
+  .avatar { width:min(52vw, 220px); aspect-ratio:1; border-radius:50%; object-fit:cover; border:8px solid var(--accent);
+    animation:bob 1.2s ease-in-out infinite; background:color-mix(in srgb, var(--accent) 30%, #111); }
+  .avatar:not([src]) { content:""; }
+  @keyframes bob { 50% { transform:translateY(-10px) rotate(2deg); } }
+  .songtitle { color:var(--accent); font-size:22px; font-weight:800; }
+  .hold { font-size:clamp(28px, 8vw, 40px); font-weight:900; color:var(--fg); }
+
+  /* record */
+  #recScreen { background:radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%); }
+  .yourline { font-size:14px; letter-spacing:.3em; font-weight:900; color:var(--accent); }
+  #lineText { font-size:clamp(34px, 10vw, 58px); font-weight:900; line-height:1.08; color:#fff; max-width:14ch; }
+  .micwrap { position:relative; width:170px; height:170px; display:grid; place-items:center; }
+  .ring { position:absolute; inset:0; border-radius:50%; background:var(--accent); opacity:.35; transform:scale(1);
+    transition:transform .08s linear; }
+  .mic { position:relative; width:120px; height:120px; border-radius:50%; background:var(--accent); display:grid; place-items:center;
+    animation:pulse 1s ease-in-out infinite; }
+  .mic svg { width:58px; height:58px; fill:#fff; }
+  @keyframes pulse { 50% { transform:scale(1.07); } }
+  .meter { width:min(80vw, 340px); height:18px; border-radius:9px; background:rgba(255,255,255,.12); overflow:hidden; }
+  .meter b { display:block; height:100%; width:100%; background:linear-gradient(90deg, var(--ok), #ffd23f, var(--accent));
+    transform-origin:left; transform:scaleX(0); transition:transform .06s linear; }
+  .timer { width:min(80vw, 340px); height:6px; border-radius:3px; background:rgba(255,255,255,.12); overflow:hidden; }
+  .timer b { display:block; height:100%; background:#fff; transform-origin:left; transform:scaleX(1); }
+
+  /* verdict */
+  .score { font-size:clamp(90px, 34vw, 160px); font-weight:900; line-height:.9; color:var(--accent); animation:pop .6s cubic-bezier(.2,1.6,.4,1); }
+  .score small { font-size:.3em; color:var(--dim); }
+  @keyframes pop { from { transform:scale(.3); opacity:0; } }
+  #roast { font-size:22px; color:var(--fg); font-weight:600; max-width:26ch; }
+  .tip { background:#2a1a00; color:#ffd23f; border:2px solid #ffd23f; border-radius:16px; padding:14px 16px; font-size:18px; font-weight:700; max-width:30ch; }
+  .tip code { background:rgba(0,0,0,.4); padding:2px 6px; border-radius:6px; }
+  .hidden { display:none !important; }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
+</style>
+</head>
+<body>
+<header><span><span id="dot"></span><b>Duet Anything</b></span><span id="hdrRight">mic</span></header>
+<main>
+  <!-- 1. Snap -->
+  <section class="screen show" id="snapScreen">
+    <h1>Snap<br>anything.</h1>
+    <label class="big" id="snapBtn" for="cam">SNAP<small>it'll sing with you</small></label>
+    <input type="file" id="cam" accept="image/*" capture="environment">
+    <p id="snapHint">Mug, trainer, your mate's head. Anything.</p>
+    <div class="tip hidden" id="micTip"></div>
+  </section>
+
+  <!-- 1b. Waking -->
+  <section class="screen" id="wakeScreen">
+    <img class="thumb hidden" id="wakeThumb" alt="">
+    <div class="blob"><i></i></div>
+    <h2>Waking it up...</h2>
+    <div id="quip">Giving it a brew...</div>
+  </section>
+
+  <!-- 2. Ready -->
+  <section class="screen" id="readyScreen">
+    <img class="avatar" id="avatar" alt="" onerror="this.removeAttribute('src')">
+    <h1 id="charName">Mug Jagger</h1>
+    <div class="songtitle" id="songTitle"></div>
+    <div class="hold">Hold your phone<br>like a mic</div>
+    <p id="readyHint">Watch the big screen. Your lines pop up here.</p>
+    <div class="tip hidden" id="micTip2"></div>
+  </section>
+
+  <!-- 3. Record -->
+  <section class="screen" id="recScreen">
+    <div class="yourline">YOUR LINE</div>
+    <div id="lineText">...</div>
+    <div class="micwrap"><div class="ring" id="ring"></div>
+      <div class="mic"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12h-2z"/></svg></div>
+    </div>
+    <div class="meter"><b id="meter"></b></div>
+    <div class="timer"><b id="timer"></b></div>
+  </section>
+
+  <!-- 3b. Sent / waiting -->
+  <section class="screen" id="sentScreen">
+    <h1 id="sentTitle">Sound!</h1>
+    <p id="sentText">Got your bit. Keep watching the stage.</p>
+  </section>
+
+  <!-- 4. Verdict -->
+  <section class="screen" id="verdictScreen">
+    <div class="score" id="score">0<small>/100</small></div>
+    <div id="roast"></div>
+    <button class="pill" id="againBtn">Snap another</button>
+  </section>
+
+  <!-- Error -->
+  <section class="screen" id="errScreen">
+    <h2>Ey up, that went wrong.</h2>
+    <p id="errText"></p>
+    <button class="pill" id="errBtn">Try again</button>
+  </section>
+</main>
+<script type="module" src="mic.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Duet Anything</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="stage.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+</head>
+<body data-screen="idle">
+  <!-- Ambient background: GPU-only drifting light blobs + beat ring -->
+  <div class="bg" aria-hidden="true">
+    <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+    <div class="beat-ring" id="beatRing"></div>
+    <div class="grain"></div>
+  </div>
+
+  <!-- One-time autoplay gate -->
+  <div class="gate" id="gate">
+    <button class="gate-btn" id="gateBtn">
+      <span class="gate-icon">&#9654;</span>
+      <span>Click to start the show</span>
+    </button>
+    <p class="gate-hint">Turns on sound + the beat. Then press <kbd>D</kbd> any time for a demo duet.</p>
+  </div>
+
+  <!-- IDLE -->
+  <section class="screen idle" id="idle">
+    <div class="idle-left">
+      <p class="eyebrow">Hack Day Manchester &middot; live karaoke</p>
+      <h1 class="title"><span class="t1">Duet</span><span class="t2">Anything</span></h1>
+      <p class="tagline">Snap any object. It comes alive, sings a duet with you, then roasts you proper.</p>
+      <div class="cta" id="idleCta"><span class="dot"></span><span id="idleCtaText">Snap anything to start</span></div>
+      <ol class="mini-board" id="idleBoard"></ol>
+    </div>
+    <div class="phone-card">
+      <div class="qr" id="qr"></div>
+      <p class="phone-label">Open on your phone</p>
+      <p class="phone-url" id="phoneUrl">checking&hellip;</p>
+      <p class="phone-usb">USB: <b>localhost:5173/mic.html</b></p>
+    </div>
+  </section>
+
+  <!-- SHOW (character + lyrics / verdict) -->
+  <section class="screen show" id="show">
+    <div class="char-col">
+      <div class="char-wrap" id="charWrap">
+        <div class="char-glow"></div>
+        <div class="char" id="char">
+          <img id="charImg" alt="">
+          <div class="face">
+            <div class="eye l"><div class="pupil"></div></div>
+            <div class="eye r"><div class="pupil"></div></div>
+            <div class="mouth" id="mouth"><div class="tongue"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="nameplate">
+        <p class="char-name" id="charName"></p>
+        <p class="char-object" id="charObject"></p>
+        <p class="char-catch" id="charCatch"></p>
+      </div>
+    </div>
+
+    <div class="right-col">
+      <div class="song-head">
+        <span class="badge" id="songGenre"></span>
+        <h2 class="song-title" id="songTitle"></h2>
+        <span class="returning" id="returning">Back for more, are we?</span>
+      </div>
+
+      <div class="lyrics" id="lyrics"><div class="track" id="track"></div></div>
+
+      <div class="verdict" id="verdict">
+        <p class="verdict-label">The verdict</p>
+        <div class="score"><span id="scoreNum">0</span><small>/100</small></div>
+        <p class="roast" id="roast"></p>
+        <div class="bw" id="bw"></div>
+        <div class="board">
+          <p class="board-title">Leaderboard</p>
+          <ol id="board"></ol>
+        </div>
+        <button class="again" id="againBtn">Again <kbd>Space</kbd></button>
+      </div>
+    </div>
+
+    <!-- YOUR LINE overlay -->
+    <div class="rec" id="rec">
+      <div class="count" id="count"></div>
+      <div class="rec-live">
+        <div class="mic">
+          <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+          <svg viewBox="0 0 24 24" width="64" height="64"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg>
+        </div>
+        <p class="rec-title">YOUR LINE</p>
+        <p class="rec-state" id="recState">Listening on your phone&hellip;</p>
+      </div>
+      <div class="got" id="got"></div>
+    </div>
+
+    <div class="judging" id="judging"><div class="spinner"></div><p>Judging you&hellip;</p></div>
+  </section>
+
+  <canvas id="confetti" aria-hidden="true"></canvas>
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="stage.js"></script>
+</body>
+</html>

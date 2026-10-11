@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hack Day Starter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Hack Day Starter</h1>
+    <div id="status" class="status">checking…</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Gemma 4</h2>
+      <textarea id="prompt" rows="3">Give me 3 wild hackathon ideas about music in Manchester, one line each.</textarea>
+      <div class="row">
+        <label><input type="checkbox" id="asJson"> JSON reply</label>
+        <input type="file" id="image" accept="image/*">
+        <button id="ask">Ask Gemma</button>
+      </div>
+      <pre id="gemmaOut"></pre>
+    </section>
+
+    <section class="card">
+      <h2>ElevenLabs</h2>
+      <input id="say" value="Hello Manchester, let's go!">
+      <div class="row">
+        <select id="voice"></select>
+        <button id="speak">Speak</button>
+      </div>
+      <input id="sfxPrompt" value="crowd cheering in a stadium">
+      <div class="row"><button id="sfx">Sound effect</button></div>
+      <p class="hint">Uses credit: text is capped (ELEVENLABS_MAX_CHARS in .env).</p>
+    </section>
+
+    <section class="card">
+      <h2>Memory (NMAFC / OpenLoft)</h2>
+      <input id="fact" value="The user loves fast drum and bass and hates slow ballads.">
+      <div class="row"><button id="remember">Remember</button></div>
+      <input id="query" value="What music does the user like?">
+      <div class="row"><button id="recall">Recall</button><button id="listMem">List all</button></div>
+      <pre id="memOut"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Phone remote</h2>
+      <p>Open on your phone: <a id="phoneLink" href="/phone.html" target="_blank">/phone.html</a></p>
+      <pre id="phoneOut">waiting for taps…</pre>
+    </section>
+  </main>
+
+  <script type="module" src="test.js"></script>
+</body>
+</html>

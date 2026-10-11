@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Phone Pads</title>
+  <style>
+    :root { --bg: #0c0e14; --pad: #1c2130; --on: #7c5cff; --text: #e8eaf2; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px system-ui, sans-serif; height: 100dvh; display: flex; flex-direction: column; padding: 12px; gap: 12px; user-select: none; }
+    .pads { flex: 1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .pad { border: 0; border-radius: 16px; background: var(--pad); color: var(--text); font-size: 20px; font-weight: 600; touch-action: manipulation; }
+    .pad.hit { background: var(--on); transform: scale(0.97); }
+    label { display: flex; gap: 10px; align-items: center; }
+    input[type=range] { flex: 1; }
+    #msg { font-size: 12px; opacity: 0.6; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="pads" id="pads"></div>
+  <label>Slider <input type="range" id="slider" min="0" max="100" value="50"></label>
+  <div id="msg">tap a pad</div>
+  <script>
+    // Each tap POSTs { type, ... } to the laptop; the page there receives it through onPhone().
+    const names = ["1", "2", "3", "4", "5", "6", "7", "8"];
+    const send = (event) => fetch("/api/phone", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(event) })
+      .then((r) => r.json()).then((r) => (msg.textContent = `sent (${r.listeners} screen${r.listeners === 1 ? "" : "s"} listening)`))
+      .catch(() => (msg.textContent = "not connected - same Wi-Fi?"));
+    for (const [i, n] of names.entries()) {
+      const b = document.createElement("button");
+      b.className = "pad";
+      b.textContent = n;
+      b.addEventListener("pointerdown", () => { b.classList.add("hit"); navigator.vibrate?.(15); send({ type: "pad", pad: i }); });
+      for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, () => b.classList.remove("hit"));
+      pads.appendChild(b);
+    }
+    let last = 0;
+    slider.addEventListener("input", () => {
+      const now = Date.now();
+      if (now - last < 60) return; // don't flood the laptop
+      last = now;
+      send({ type: "slider", value: Number(slider.value) });
+    });
+  </script>
+</body>
+</html>
