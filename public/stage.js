@@ -752,6 +752,42 @@ async function memoryCard(s, myRun) {
   await sleep(350);
 }
 
+/** FLOW: each bar is its own take; drop each one on a downbeat, time-stretched (pitch kept) to fill whole bars. */
+async function playBars(bars, myRun, onTotal) {
+  ensureAudio();
+  const bpm = Beat.bpm(), bar = bpm ? (240 / bpm) * 1000 : 0;
+  const els = bars.map((b) => { const a = new Audio(); a.src = b.audio; a.preload = "auto"; return a; });
+  await Promise.all(els.map((a) => new Promise((r) => {
+    if (a.readyState >= 1) return r();
+    a.addEventListener("loadedmetadata", r, { once: true }); a.addEventListener("error", r, { once: true }); setTimeout(r, 3000);
+  })));
+  guard(myRun);
+  const plan = els.map((a) => {
+    const dur = isFinite(a.duration) && a.duration > 0 ? a.duration * 1000 : 1800;
+    if (!bar) return { a, rate: 1, slot: dur + 120 };
+    const nb = Math.max(1, Math.round(dur / bar - 0.1));
+    return { a, rate: Math.max(0.85, Math.min(1.3, dur / (nb * bar))), slot: nb * bar };
+  });
+  const lead = bar ? Beat.nextBarMs() : 0;
+  onTotal?.(lead + plan.reduce((t, p) => t + p.slot, 0));
+  const t0 = performance.now() + lead;
+  let at = 0;
+  for (const p of plan) {
+    const wait = t0 + at - performance.now();
+    if (wait > 0) await sleep(wait);
+    guard(myRun);
+    const src = ctx.createMediaElementSource(p.a);
+    src.connect(analyser);
+    p.a.preservesPitch = true; p.a.playbackRate = p.rate;
+    playing.add(p.a);
+    p.a.addEventListener("ended", () => { playing.delete(p.a); try { src.disconnect(); } catch {} }, { once: true });
+    p.a.play().catch(() => {});
+    at += p.slot;
+  }
+  const left = t0 + at - performance.now();
+  if (left > 0) await sleep(left);
+}
+
 async function objectLine(i, line, myRun, c) {
   const ms = line.ms || 3500;
   wipe(i, ms);
@@ -768,6 +804,9 @@ async function objectLine(i, line, myRun, c) {
       try { await playMp3(line.rapAudio, line.rapMs || ms, retimeWipe, (a) => caps.attachAudio(a)); return; }
       catch (e) { console.warn("[stage] rap track failed, using TTS", e.message); }
       finally { if (session?.song === sg) Beat.start({ genre: sg.genre || "pop", bpm: sg.bpm || 100, key: sg.key || "C" }); }
+    }
+    if (line.bars?.length > 1 && !silent) {
+      try { await playBars(line.bars, myRun, retimeWipe); return; } catch (e) { if (e instanceof Aborted) throw e; console.warn("[stage] bar flow failed, using one take", e?.message); }
     }
     if (line.audio && !silent) {
       try { await playMp3(line.audio, ms, retimeWipe, (a) => caps.attachAudio(a), true); return; } catch (e) { console.warn("[stage] line audio failed, using fallback voice", e.message); }
