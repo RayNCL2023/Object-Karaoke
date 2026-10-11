@@ -839,6 +839,25 @@ async function waitRound(r, pred, ms, myRun) {
 function addLyric(who, text, name) { return caps.add(who, text, name); }
 function bigCount(text) { el.count.classList.toggle("word", String(text).length > 3); el.count.textContent = text; el.count.classList.remove("go"); void el.count.offsetWidth; el.count.classList.add("go"); }
 
+// Speech bubble from the character (heckles during your turn, reactions after)
+const HECKLES = {
+  mild: ["Go on then!", "Ooh, okay!", "Is that a rhyme?", "Keep going!", "Not bad...", "I'm listening!"],
+  spicy: ["Is that it?", "Go on, our kid!", "Weak!", "Yawn...", "Bars? Where?", "My kettle raps better", "Speak up!"],
+  savage: ["Pathetic.", "Is that ALL?", "Booo!", "Get off!", "My nan's harder", "Embarrassing.", "Try again."],
+};
+let heckleEl = null;
+function heckle(text) {
+  if (!heckleEl) { heckleEl = document.createElement("div"); heckleEl.className = "heckle"; document.getElementById("show")?.appendChild(heckleEl); }
+  heckleEl.textContent = text;
+  heckleEl.classList.remove("on"); void heckleEl.offsetWidth; heckleEl.classList.add("on");
+  clearTimeout(heckle.t); heckle.t = setTimeout(() => heckleEl.classList.remove("on"), 2200);
+}
+const COOK = ["Cooking a comeback...", "Sharpening bars...", "Finding a rhyme...", "Loading the diss...", "Warming up the voice..."];
+function cookQuips() {
+  const p = el.cooking.querySelector("p"); let i = 0;
+  const t = setInterval(() => { i = (i + 1) % COOK.length; if (p) p.textContent = COOK[i]; }, 1600);
+  return () => { clearInterval(t); if (p) p.textContent = COOK[0]; };
+}
 async function battleRounds(s, myRun, c) {
   const rounds = s.battle?.rounds || 3, youMs = s.battle?.youMs || 12000, name = c.name || "Object";
   focusLine(0);
@@ -853,16 +872,14 @@ async function battleRounds(s, myRun, c) {
     setPose("thinking");
     const heard = await waitRound(r, (d) => d.heard, 9000, myRun);
     const said = heard?.transcript || "";
-    const yi = addLyric("you", said ? `"${said}"` : "(... silence ...)", name);
-    focusLine(yi);
-    el.got.innerHTML = said ? `You: <small>"${esc(said.slice(0, 160))}"</small>` : `Nowt. <small>Cat got your tongue?</small>`;
-    el.got.classList.add("show");
-    if (r >= rounds) { setPose("laugh"); await sleep(2200); guard(myRun); el.got.classList.remove("show"); setPose(null); break; }
-    // Short "wait for it" beat while the comeback is written + voiced
+    // The room heard the player live: no read-back of their bars on screen, just the object reacting.
+    if (r >= rounds) { setPose("laugh"); heckle(said ? "Right. Judges?" : "Nothing?! Judges..."); await sleep(1600); guard(myRun); setPose(null); break; }
+    // "Wait for it" beat while the comeback is written + voiced: rotating quips so the stage never feels empty
     const t0 = performance.now();
     if (!roundData.get(r)?.done) el.cooking.classList.add("on");
+    const stopQuips = cookQuips();
     let done;
-    try { done = await waitRound(r, (d) => d.done, 16000, myRun); } finally { el.cooking.classList.remove("on"); }
+    try { done = await waitRound(r, (d) => d.done, 16000, myRun); } finally { stopQuips(); el.cooking.classList.remove("on"); }
     await sleep(Math.max(0, 1100 - (performance.now() - t0))); guard(myRun);
     setPose(null);
     el.got.classList.remove("show");
@@ -898,6 +915,7 @@ async function freestyleTurn(r, rounds, ms, myRun) {
       el.recState.textContent = `Round ${r} of ${rounds} · roast it back! · ${phoneMicOk ? "phone mic" : "laptop mic"}`;
       if (el.turnClock.textContent !== String(left)) { el.turnClock.textContent = String(left); el.turnClock.classList.toggle("hot", left <= 5); el.turnClock.classList.remove("tick"); void el.turnClock.offsetWidth; el.turnClock.classList.add("tick"); }
       el.turnClock.classList.add("on");
+      if (left > 1 && left % 3 === 0 && heckle.last !== left) { heckle.last = left; const list = HECKLES[document.body.dataset.difficulty] || HECKLES[typeof gameDifficulty === "string" ? gameDifficulty : "spicy"] || HECKLES.spicy; heckle(list[(r * 7 + left) % list.length]); setGesture?.(left % 2 ? "point" : "hands", 500); }
       await sleep(Math.min(1000, Math.max(50, end - performance.now() - (left - 1) * 1000)));
       guard(myRun);
     }
@@ -973,10 +991,10 @@ const blobToBase64 = (blob) => new Promise((res, rej) => { const r = new FileRea
 async function voteClosing(myRun) {
   el.vclose.classList.add("on");
   try {
-    for (const n of ["3", "2", "1"]) {
+    for (const n of ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"]) {
       el.vcloseN.textContent = n;
       el.vcloseN.classList.remove("go"); void el.vcloseN.offsetWidth; el.vcloseN.classList.add("go");
-      await sleep(1600); guard(myRun);
+      await sleep(1000); guard(myRun);
     }
   } finally { el.vclose.classList.remove("on"); }
 }
@@ -985,7 +1003,7 @@ async function judge(myRun) {
   let crowdTally = null;
   const voting = (session.battle || session.mode === "battle") && (crowd.audienceCount() > 0 || session.pvp); // let the crowd's last votes land
   // Real sessions: the server waits waitVotesMs, then closes voting and judges, while the stage shows VOTE CLOSING 3..2..1.
-  const judgeP = session.demo ? Promise.reject(new Error("offline demo")) : postJson("/api/judge", { id: session.id, ...(voting ? { waitVotesMs: 5000 } : {}), ...(session.youtube && window.KaraokeYT ? { asked: window.KaraokeYT.asked() } : {}) });
+  const judgeP = session.demo ? Promise.reject(new Error("offline demo")) : postJson("/api/judge", { id: session.id, ...(voting ? { waitVotesMs: 10000 } : {}), ...(session.youtube && window.KaraokeYT ? { asked: window.KaraokeYT.asked() } : {}) });
   judgeP.catch(() => {});
   if (voting) await voteClosing(myRun);
   if (session.demo && voting) { try { crowdTally = (await postJson("/api/audience/close", { id: session.id })).tally || null; } catch {} }

@@ -639,3 +639,8 @@ body:not([data-screen="idle"]) .gate-hint { display: none; }
 body:has(.wk.on:not(.done)) .gate { left: 0; right: 0; top: auto; bottom: 30px; display: flex; justify-content: center; pointer-events: none; z-index: 200; }
 body:has(.wk.on:not(.done)) .gate-btn { pointer-events: auto; font-size: 28px; padding: 8px 20px 8px 10px; }
 body:has(.wk.on:not(.done)) .gate-hint { display: none; }
+
+/* Character heckles during your turn (speech bubble beside the character) */
+.heckle { position: absolute; left: 25cqw; top: 14cqh; z-index: 8; max-width: 26cqw; padding: 14px 22px; background: #fff; color: #111; border: 5px solid #111; box-shadow: 8px 8px 0 var(--accent); font: 400 46px/1.05 var(--anton); text-transform: uppercase; opacity: 0; transform: translate3d(0, 16px, 0) scale(0.85) rotate(-3deg); transition: opacity 0.2s var(--ease), transform 0.35s var(--spring); pointer-events: none; }
+.heckle::after { content: ""; position: absolute; left: -26px; bottom: 18px; border: 13px solid transparent; border-right-color: #111; }
+.heckle.on { opacity: 1; transform: rotate(-3deg); }
