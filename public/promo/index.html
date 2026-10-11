@@ -323,6 +323,7 @@ const SCENES = [
   { id: "s5", dur: 6 }, { id: "s6", dur: 5 }, { id: "s7", dur: 6 }, { id: "s8", dur: 14 }, { id: "s9", dur: 7 },
 ];
 const TOTAL = SCENES.reduce((a, s) => a + s.dur, 0); // 60
+const VO = false; // voiceover off (beat only); set true to bring the MC back
 let acc = 0; SCENES.forEach((s, i) => { s.start = acc; acc += s.dur; s.vo = new Audio(`vo-${i + 1}.mp3`); s.vo.preload = "auto"; s.vo.volume = 1; });
 
 let t0 = 0, cur = -1, running = false, card = -1;
@@ -330,7 +331,7 @@ function show(i) {
   SCENES.forEach((s, j) => document.getElementById(s.id).classList.toggle("on", j === i));
   SCENES.forEach((s) => { s.vo.pause(); });
   const s = SCENES[i];
-  try { s.vo.currentTime = 0; s.vo.play().catch(() => {}); } catch {}
+  if (VO) try { s.vo.currentTime = 0; s.vo.play().catch(() => {}); } catch {}
   duck();
 
   if (s.id === "s8") { card = -1; tcards.forEach((c) => c.classList.remove("on", "gone")); }
@@ -397,7 +398,7 @@ function buildMusic() {
   };
 }
 function duck() {
-  if (!music) return;
+  if (!music || !VO) return;
   const vo = SCENES[cur].vo; music.duck(true);
   vo.onended = () => music.duck(false);
 }
@@ -428,3 +429,5 @@ if (new URLSearchParams(location.search).has("auto")) start();
 </body>
 </html>
 <style>body:has(#s9.on) .brand { color: var(--yellow); }</style>
+<style>#s9 .char { display: none !important; }</style>
+<style>.shades, .chain { display: none !important; }</style>
